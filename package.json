@@ -1,0 +1,29 @@
+{
+  "name": "research-scope-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "server.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "start:http": "node dist/index.js --http --port 3001",
+    "test": "npm run build && node --test test/server.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

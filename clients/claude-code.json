@@ -1,0 +1,10 @@
+// Claude Code — add via `claude mcp add` or paste into the project .mcp.json
+// Local stdio:
+{
+  "mcpServers": {
+    "research-scope": {
+      "command": "npx",
+      "args": ["-y", "research-scope-mcp"]
+    }
+  }
+}

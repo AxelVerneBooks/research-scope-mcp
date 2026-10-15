@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.axelverne/research-scope-mcp",
+  "displayName": "Research Scope",
+  "description": "Research-to-report workflow server: plan source targets with kill criteria, fetch-and-score sources (primary-source detection, freshness, paywall/COI flags), and build or verify citation-registry reports where every claim must cite a scored source.",
+  "version": "0.1.0",
+  "publisher": "Axel Verne",
+  "repository": {
+    "url": "https://github.com/USERNAME/research-scope-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "research-scope-mcp",
+      "version": "0.1.0",
+      "environmentVariables": [
+        {
+          "name": "RESEARCH_SCOPE_DATA_DIR",
+          "description": "Directory for generated report shells (default: ./data under the working directory)",
+          "required": false
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://YOUR_HOST/mcp",
+      "transport": {
+        "type": "streamable-http"
+      }
+    }
+  ]
+}

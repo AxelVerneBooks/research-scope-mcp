@@ -1,0 +1,9 @@
+// Cursor — .cursor/mcp.json
+{
+  "mcpServers": {
+    "research-scope": {
+      "command": "npx",
+      "args": ["-y", "research-scope-mcp"]
+    }
+  }
+}
