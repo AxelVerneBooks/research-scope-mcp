@@ -10,14 +10,16 @@ Everything that could be prepared locally is prepared and verified:
 
 ## Gates that need the user/account (cannot be automated here)
 
-1. **Real GitHub namespace.** `server.json` currently has placeholders:
-   - `name`: `io.github.axelverne/research-scope-mcp` — must be
-     `io.github.<your-GitHub-username>/research-scope-mcp` and match the account you
-     log in with
-   - `repository.url`: point at the real public repo once created
-   - `websiteUrl`: your real store/landing URL (or delete the field)
-   - `remotes[]`: leave only if you actually host the HTTP server publicly; an
-     stdio-only server should delete the `remotes` section entirely
+1. ~~**Real GitHub namespace.**~~ **RESOLVED 2026-10-15:** namespace is
+   `io.github.axelvernebooks/research-scope-mcp`, `repository.url` →
+   `github.com/AxelVerneBooks/research-scope-mcp`, `websiteUrl` → `axelverne.com`
+   (all patched here; account verified live via the GitHub API). Remaining:
+   **create the public repo under AxelVerneBooks and push** — must be done under
+   that login (`gh` CLI on this machine is authed as a different account), then
+   keep the browser session on **AxelVerneBooks** for the OAuth step in gate 3.
+   If the OAuth session ever lands on a different login, the namespace must be
+   edited to match *before* publish (versions are immutable; a wrong namespace
+   means re-publishing a new version).
 2. **Create the public repo + push:**
    `git remote add origin git@github.com:<user>/research-scope-mcp.git && git push -u origin main`
    (public repo is what Glama/admin-access scans require)

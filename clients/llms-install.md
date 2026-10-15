@@ -16,7 +16,7 @@ npm install -g research-scope-mcp
 If the package is not yet published to npm, install from this repo instead:
 
 ```bash
-git clone https://github.com/USERNAME/research-scope-mcp
+git clone https://github.com/AxelVerneBooks/research-scope-mcp
 cd research-scope-mcp
 npm ci && npm run build
 ```

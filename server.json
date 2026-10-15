@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.axelverne/research-scope-mcp",
+  "name": "io.github.axelvernebooks/research-scope-mcp",
   "title": "Research Scope",
   "description": "Plan research, score sources for freshness/COI, and enforce claim-level citations in reports.",
   "version": "0.1.0",
-  "websiteUrl": "https://axelverne.example/research-scope-mcp",
+  "websiteUrl": "https://axelverne.com/",
   "repository": {
-    "url": "https://github.com/USERNAME/research-scope-mcp",
+    "url": "https://github.com/AxelVerneBooks/research-scope-mcp",
     "source": "github"
   },
   "packages": [
