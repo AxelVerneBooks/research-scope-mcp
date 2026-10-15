@@ -8,6 +8,13 @@ Everything that could be prepared locally is prepared and verified:
   live network fetch), stdio + Streamable HTTP both smoke-tested
 - ✅ `mcp-publisher` v1.8.1 binary installed at `~/bin/mcp-publisher`
 
+## Run form — copy-paste packet
+
+The exact commands (repo-create + push under AxelVerneBooks, registry login/publish)
+and the Cline issue-firing sequence are packaged step-by-step in
+[docs/publication/publish-day-packet.md](docs/publication/publish-day-packet.md) —
+built 2026-10-15 to run with zero improvisation after the AxelVerneBooks login.
+
 ## Gates that need the user/account (cannot be automated here)
 
 1. ~~**Real GitHub namespace.**~~ **RESOLVED 2026-10-15:** namespace is
