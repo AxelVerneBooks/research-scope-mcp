@@ -1,10 +1,10 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.axelverne/research-scope-mcp",
-  "displayName": "Research Scope",
-  "description": "Research-to-report workflow server: plan source targets with kill criteria, fetch-and-score sources (primary-source detection, freshness, paywall/COI flags), and build or verify citation-registry reports where every claim must cite a scored source.",
+  "title": "Research Scope",
+  "description": "Plan research, score sources for freshness/COI, and enforce claim-level citations in reports.",
   "version": "0.1.0",
-  "publisher": "Axel Verne",
+  "websiteUrl": "https://axelverne.example/research-scope-mcp",
   "repository": {
     "url": "https://github.com/USERNAME/research-scope-mcp",
     "source": "github"
@@ -22,7 +22,9 @@
         }
       ],
       "transport": {
-        "type": "stdio"
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "research-scope-mcp"]
       }
     }
   ],
@@ -30,9 +32,7 @@
     {
       "type": "streamable-http",
       "url": "https://YOUR_HOST/mcp",
-      "transport": {
-        "type": "streamable-http"
-      }
+      "headers": []
     }
   ]
 }
