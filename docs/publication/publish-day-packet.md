@@ -68,8 +68,9 @@ cd /Users/agent/Projects/research-scope-mcp
 ~/bin/mcp-publisher publish
 ```
 
-- The namespace `io.github.axelvernebooks/research-scope-mcp` matches the login —
-  the publish is accepted on that pairing.
+- The namespace is case-sensitive: the login grants `io.github.AxelVerneBooks/*`
+  (matching the GitHub login's capitalization) and `server.json` matches it. A
+  lowercase `name` gets a 403. The publish is accepted on that pairing.
 - **npm decision reminder:** `server.json` still claims `packages[] → registryType:
   npm`. If the npm package isn't published today, delete the `packages[]` block,
   bump the version trio (`package.json`, `src/version.ts`, `server.json`),

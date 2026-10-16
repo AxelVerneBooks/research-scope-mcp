@@ -18,23 +18,25 @@ built 2026-10-15 to run with zero improvisation after the AxelVerneBooks login.
 ## Gates that need the user/account (cannot be automated here)
 
 1. ~~**Real GitHub namespace.**~~ **RESOLVED 2026-10-15:** namespace is
-   `io.github.axelvernebooks/research-scope-mcp`, `repository.url` →
+   `io.github.AxelVerneBooks/research-scope-mcp` (case-sensitive — the OAuth token
+   grants `io.github.AxelVerneBooks/*`; lowercase names get a 403), `repository.url` →
    `github.com/AxelVerneBooks/research-scope-mcp`, `websiteUrl` → `axelverne.com`
-   (all patched here; account verified live via the GitHub API). Remaining:
-   **create the public repo under AxelVerneBooks and push** — must be done under
-   that login (`gh` CLI on this machine is authed as a different account), then
-   keep the browser session on **AxelVerneBooks** for the OAuth step in gate 3.
-   If the OAuth session ever lands on a different login, the namespace must be
-   edited to match *before* publish (versions are immutable; a wrong namespace
-   means re-publishing a new version).
+   (all patched here; account verified live via the GitHub API). ~~Remaining:
+   **create the public repo under AxelVerneBooks and push**~~ — **DONE 2026-10-15**
+   (repo public, `main` pushed, all download URLs verified). If the OAuth session ever
+   lands on a different login, the namespace must be edited to match *before* publish
+   (versions are immutable; a wrong namespace means re-publishing a new version).
 2. **Create the public repo + push:**
    `git remote add origin git@github.com:<user>/research-scope-mcp.git && git push -u origin main`
    (public repo is what Glama/admin-access scans require)
 3. **Login (one-time OAuth):** `~/bin/mcp-publisher login github` — opens a browser
    flow; the token is cached locally.
-4. **npm package must exist** if the `packages[]` block says `registryType: npm`.
-   Either publish first (`npm publish` — currently private/unpublished) or delete the
-   `packages[]` block and keep only `remotes[]` until npm publication.
+4. ~~**npm package must exist** if the `packages[]` block says `registryType: npm`.~~
+   **RESOLVED 2026-10-15:** took the fallback — `packages[]` deleted (npm publication
+   deferred; install path is repo clone + `npm ci && npm run build`). The placeholder
+   `remotes[]` block was also removed rather than publish a fake URL. Registry
+   publication landed same day: `io.github.AxelVerneBooks/research-scope-mcp` v0.1.0,
+   status `active`.
 5. **Publish:** `cd repo && ~/bin/mcp-publisher publish`
 
 ## Immutable-version discipline

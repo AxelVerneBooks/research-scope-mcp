@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.axelvernebooks/research-scope-mcp",
+  "name": "io.github.AxelVerneBooks/research-scope-mcp",
   "title": "Research Scope",
   "description": "Plan research, score sources for freshness/COI, and enforce claim-level citations in reports.",
   "version": "0.1.0",
@@ -8,31 +8,5 @@
   "repository": {
     "url": "https://github.com/AxelVerneBooks/research-scope-mcp",
     "source": "github"
-  },
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "research-scope-mcp",
-      "version": "0.1.0",
-      "environmentVariables": [
-        {
-          "name": "RESEARCH_SCOPE_DATA_DIR",
-          "description": "Directory for generated report shells (default: ./data under the working directory)",
-          "required": false
-        }
-      ],
-      "transport": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "research-scope-mcp"]
-      }
-    }
-  ],
-  "remotes": [
-    {
-      "type": "streamable-http",
-      "url": "https://YOUR_HOST/mcp",
-      "headers": []
-    }
-  ]
+  }
 }
