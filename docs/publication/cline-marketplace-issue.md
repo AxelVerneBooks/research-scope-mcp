@@ -68,8 +68,9 @@ Setup requirements:
 Special notes for Marketplace users:
 - Cline installation was validated against clients/llms-install.md (the file Cline
   uses); the shortest verification is asking the agent to call plan_research.
-- The 0.1.0 server.json is already validated against the official MCP registry
-  (2025-12-11 schema) — registry publication is scheduled with this same version.
+- The 0.1.0 server.json is already **published and active** on the official MCP
+  registry (`io.github.AxelVerneBooks/research-scope-mcp`, published 2026-10-15,
+  2025-12-11 schema).
 - License: MIT. No telemetry. Local-only by default.
 ```
 
