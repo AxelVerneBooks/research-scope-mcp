@@ -83,7 +83,7 @@ starter pitch, stated plainly)**
 > field guide + both worked runs + version-pinned updates. No bundle pressure; if
 > the checklist already changed how you ship reports, the Starter is the natural
 > next step — that's the whole pitch.
-> → [starter kit link]
+> → https://alohahilo.gumroad.com/l/research-to-report-starter
 
 **Email 4 — +7 days (and reusable as a customer broadcast). Subject: "Scoring rubric
 v1.1 — what changed and why"**

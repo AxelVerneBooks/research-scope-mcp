@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>research-scope-mcp — the honest 60s demo</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b0e14; color: #d6deeb; font: 15px/1.5 "SF Mono", ui-monospace, Menlo, monospace; }
+  #stage { max-width: 980px; margin: 0 auto; padding: 28px 20px 60px; }
+  .scene { display: none; margin: 0 0 18px; animation: fadein .5s; }
+  .scene.live { display: block; }
+  .scene.old { display: block; opacity: .38; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none;} }
+  .cmd { color: #7fd4ff; white-space: pre-wrap; }
+  .cmd::before { content: "$ "; color: #586a85; }
+  .lbl { color: #586a85; letter-spacing: .12em; font-size: 12px; text-transform: uppercase; margin-bottom: 6px; }
+  .json { white-space: pre-wrap; color: #b9c4d4; }
+  .k { color: #c792ea; }
+  .v { color: #82e0aa; }
+  .num { color: #ffcb6b; }
+  .fail { color: #ff5370; font-weight: 700; }
+  .ok { color: #82e0aa; }
+  .orphan { border-left: 3px solid #ff5370; background: rgba(255,83,112,.08); padding: 10px 14px; margin: 10px 0; border-radius: 4px; }
+  .claim-body { color: #d6deeb; }
+  .cited { color: #82e0aa; font-weight: 700; }
+  .nocite { color: #ff5370; font-weight: 700; }
+  .bar { display: inline-block; height: 10px; width: var(--w, 50%); background: #82e0aa; border-radius: 5px; vertical-align: middle; }
+  .bartrack { display: inline-block; width: 260px; background: #1d2430; border-radius: 5px; padding: 0; vertical-align: middle; margin-right: 8px; }
+  h1 { font-size: 30px; margin: 30vh 0 10px; text-align: center; font-weight: 600; }
+  .sub { text-align: center; color: #7d8ca3; }
+  .outro { text-align: center; margin-top: 14vh; }
+  .outro .big { font-size: 26px; color: #fff; }
+  #verdict { font-size: 22px; padding: 14px 18px; border-radius: 8px; background: rgba(255,83,112,.12); border: 1px solid rgba(255,83,112,.5); animation: pop .35s; }
+  @keyframes pop { from { transform: scale(.96); opacity: 0;} to { transform: none; opacity: 1;} }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 16px; font-size: 11px; color: #586a85; background: rgba(11,14,20,.9); border-top: 1px solid #1d2430; }
+  .cursor { display: inline-block; width: 9px; height: 1.1em; background: #7fd4ff; vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .wait { color: #586a85; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0–4s TITLE -->
+  <div class="scene" id="s0">
+    <h1>plan&nbsp;→&nbsp;score&nbsp;→&nbsp;check</h1>
+    <div class="sub">research-scope-mcp 0.1.1 — the honest 60-second demo<br>a live capture: real server, real fetch, one deliberately uncited claim</div>
+  </div>
+
+  <!-- scenes 1..5 stack below (older scenes dim but stay) -->
+  <div class="scene" id="s1"><div class="lbl">1 · plan_research</div>
+    <div class="cmd">plan_research({ scope: "verify vendor data-retention claim before it goes in a comparison article" })</div>
+    <div class="json" id="s1out"></div>
+  </div>
+
+  <div class="scene" id="s2"><div class="lbl">2 · fetch_and_score (live fetch)</div>
+    <div class="cmd">fetch_and_score({ source_url: "https://www.nhtsa.gov/" })</div>
+    <div class="json" id="s2out"></div>
+  </div>
+
+  <div class="scene" id="s3"><div class="lbl">3 · build_report</div>
+    <div class="cmd">build_report({ topic: "Vendor data-retention claim — comparison-article audit", sources: ["https://www.nhtsa.gov/"] })</div>
+    <div class="json" id="s3out"></div>
+  </div>
+
+  <div class="scene" id="s4"><div class="lbl">4 · claims section being written (human edit)</div>
+    <div id="s4out" class="json"></div>
+  </div>
+
+  <div class="scene" id="s5"><div class="lbl">5 · check_report</div>
+    <div class="cmd">check_report({ report_path: "…/reports/report-14af333e.md" })</div>
+    <div class="wait" id="s5wait">running…</div>
+    <div class="json" id="s5out"></div>
+    <div id="verdict" style="display:none">FAIL — orphan claims above cite no scored source; fill or remove them</div>
+  </div>
+
+  <!-- 54–60s OUTRO -->
+  <div class="scene" id="s6"><div class="outro">
+    <div class="big">Orphan claims come back as <span class="fail">errors</span> — never a pass.</div>
+    <div class="sub" style="margin-top:10px">research-scope-mcp 0.1.1 · $9 Starter kit · transcript: run-capture.jsonl</div>
+  </div></div>
+
+</div>
+<footer>captured live run of node dist/index.js (stdio) · run-capture.jsonl · sha256 3c752cddac558fd6…2756f66f · fetch, scores, registry and check are real server output</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+
+// ---- real captured excerpts (verbatim from run-capture.jsonl, trimmed for the screen) ----
+const planOut =
+`{
+  <span class="k">primarySourceTargets</span>: [
+    { what: "The original claim-maker's own statement (press release, changelog, official filing)" },
+    { what: "Any regulator / standards body page covering the domain (.gov)" }
+  ],
+  <span class="k">killCriteria</span>: [
+    "Fewer than 1 primary + 2 independent secondaries found → stop, report 'insufficient sources'",
+    "<span class="num">Every scored source below 45/100</span> → stop"
+  ]
+}`;
+
+const scoreOut =
+`{
+  <span class="k">url</span>: "https://www.nhtsa.gov/",
+  <span class="k">score</span>: <span class="num">90</span>, <span class="k">grade</span>: <span class="v">"A"</span>,
+  <span class="k">isPrimarySource</span>: true — "primary host: www.nhtsa.gov",
+  <span class="k">freshness</span>: published 2026-10-16 (0d ago) — 24/24
+  <span class="k">flags</span>: []
+  breakdown: <span class="bartrack"><span class="bar" style="--w:90%"></span></span> 90/100
+}`;
+
+const buildOut =
+`<span class="ok">Report shell 14af333e saved to …/reports/report-14af333e.md</span>
+
+## Citation registry
+[S1] https://www.nhtsa.gov/ — <span class="ok">score 90/100 (A, published 2026-10-16)</span>`;
+
+// claims scene: type the two lines, second lands WITHOUT [S1]
+const claimA = 'Vendor\u2019s review page reports the 90-day default and claims the 90-day floor applies to every plan tier <span class="cited">[S1]</span>';
+const claimB = 'The platform-by-platform comparison shows retention varies far more between plans than the vendor\u2019s marketing concedes<span class="nocite">&nbsp;&nbsp;← no [Sn]</span>';
+
+// check scene: verbatim result fields
+const checkOut =
+`{
+  <span class="k">pass</span>: <span class="fail">false</span>,
+  <span class="k">claimsFound</span>: <span class="num">2</span>,  <span class="k">claimsCited</span>: <span class="num">1</span>,
+  <span class="k">orphanClaims</span>: [
+    { <span class="k">claimId</span>: <span class="num">"C6"</span>,
+      <span class="k">claim</span>: "The platform-by-platform comparison shows retention varies far more between plans than the vendor's marketing concedes.",
+      sourceUrls: [] }
+  ],
+}`;
+
+// ---- timeline (seconds) → total 60s ----
+const timeline = [
+  { t: 0,  fn: () => show("s0", true) },
+  { t: 4,  fn: () => { demote("s0"); show("s1", true); } },
+  { t: 5,  fn: () => { $("s1out").innerHTML = planOut; } },
+  { t: 11, fn: () => { demote("s1"); show("s2", true); } },
+  { t: 12, fn: () => { $("s2out").innerHTML = scoreOut; } },
+  { t: 22, fn: () => { demote("s2"); show("s3", true); } },
+  { t: 23, fn: () => { $("s3out").innerHTML = buildOut; } },
+  { t: 30, fn: () => { demote("s3"); show("s4", true); typeInto("s4out", claimA, 3000); } },
+  { t: 36, fn: () => { appendLine($("s4out")); typeInto($("s4out"), claimB, 4000, "claim-line-2"); } },
+  { t: 42, fn: () => { demote("s4"); show("s5", true); } },
+  { t: 45, fn: () => { $("s5wait").remove(); $("s5out").innerHTML = checkOut; } },
+  { t: 51, fn: () => { $("verdict").style.display = "block"; } },
+  { t: 54, fn: () => { demote("s5"); show("s6", true); } },
+];
+
+function show(id, live) { $(id).classList.add(live ? "live" : "old"); }
+function demote(id) { const el = $(id); el.classList.remove("live"); el.classList.add("old"); }
+
+function typeInto(container, html, ms, extraClass) {
+  const span = document.createElement("div");
+  span.className = extraClass || "";
+  container.appendChild(span);
+  const tmp = document.createElement("div"); tmp.innerHTML = html;
+  const text = tmp.textContent;
+  const start = performance.now();
+  (function step(now) {
+    const p = Math.min(1, (now - start) / ms);
+    const visible = text.slice(0, Math.round(p * text.length));
+    span.innerHTML = visible + '<span class="cursor"></span>';
+    if (p < 1) requestAnimationFrame(step);
+    else span.innerHTML = html;
+  })(start);
+}
+function appendLine(container) {
+  const br = document.createElement("div");
+  br.style.height = "10px";
+  container.appendChild(br);
+}
+
+const start = performance.now();
+const timers = timeline.map(ev => setTimeout(ev.fn, ev.t * 1000));
+</script>
+</body>
+</html>
