@@ -4,6 +4,23 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [0.1.1] — 2026-10-15
+
+### Fixed
+- **Streamable HTTP: every request after `initialize` returned a silent 500**
+  (empty body). Root cause: a single shared stateless transport (`sessionIdGenerator:
+  undefined`) was created at startup and reused for all requests, but the SDK
+  requires a fresh server + transport pair **per request** in stateless mode
+  ("Stateless transport cannot be reused across requests"). `runHttp` now builds
+  both per request and closes them on response end — the SDK's official stateless
+  example pattern. Verified: sessionless `initialize` → `tools/call plan_research`
+  returns 200 with a full plan.
+
+### Added
+- Regression test `stateless HTTP transport: second request works with no session`
+  in `test/server.test.mjs` — sends sessionless `initialize`, then `tools/list`,
+  then a real `tools/call` and asserts non-500 with full payloads.
+
 ## [0.1.0] — 2026-10-15
 
 ### Added

@@ -3,7 +3,7 @@
   "name": "io.github.AxelVerneBooks/research-scope-mcp",
   "title": "Research Scope",
   "description": "Plan research, score sources for freshness/COI, and enforce claim-level citations in reports.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://axelverne.com/",
   "repository": {
     "url": "https://github.com/AxelVerneBooks/research-scope-mcp",

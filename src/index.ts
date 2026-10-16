@@ -169,7 +169,12 @@ function renderReportShell(topic: string, sources: PaperTrailEntry[]): string {
 /* server                                                              */
 /* ------------------------------------------------------------------ */
 
-const server: McpServer = new McpServer(
+// Factory (not a singleton): the Streamable HTTP transport is stateless and
+// requires a fresh server + transport pair per request. Shared in-memory
+// registries (scoreRegistry, reports) live at module scope, so every instance
+// sees the same scores/reports.
+function buildServer(): McpServer {
+  const server: McpServer = new McpServer(
   { name: "research-scope-mcp", version },
   {
     instructions:
@@ -369,6 +374,11 @@ server.registerTool(
     };
   }
 );
+  return server;
+}
+
+// stdio keeps one long-lived server for the process lifetime.
+const server: McpServer = buildServer();
 
 /* ------------------------------------------------------------------ */
 /* transports                                                          */
@@ -381,32 +391,47 @@ async function runStdio(): Promise<void> {
 }
 
 function runHttp(port: number): void {
-  // Streamable HTTP stateless-ish single-session pattern from the SDK examples
-  const httpTransport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  void server
-    .connect(httpTransport)
-    .then(() => {
-      const httpServer = createHttpServer(async (req, res) => {
-        try {
-          await httpTransport.handleRequest(req, res);
-        } catch (err) {
-          // never leak as 403; protocol discovery errors surface as 401/discovery doc
+  // Stateless Streamable HTTP: the SDK requires a fresh transport per request
+  // (a reused stateless transport throws "cannot be reused across requests"
+  // from the second request on, which surfaced as silent 500s). Mirror the
+  // SDK's official stateless example: new server + new transport per request,
+  // both closed when the response ends. Module-scope registries keep state.
+  const httpServer = createHttpServer((req, res) => {
+    void (async () => {
+      try {
+        const requestServer = buildServer();
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        res.on("close", () => {
+          void transport.close();
+          if (requestServer) {
+            void requestServer.close();
+          }
+        });
+        await requestServer.connect(transport);
+        await transport.handleRequest(req, res);
+        // Note: closing the pair here (after a completed request) would race
+        // clients that keep SSE streams open; the "close" listener owns teardown.
+      } catch (err) {
+        // never leak as 403; protocol discovery errors surface as 401/discovery doc
+        if (!res.headersSent) {
           res.statusCode = 500;
           res.setHeader("content-type", "application/json");
-          res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: (err as Error).message } }));
         }
-      });
-      httpServer.listen(port, () => {
-        const addr = httpServer.address();
-        const bound = typeof addr === "object" && addr ? `${addr.address}:${addr.port}` : String(port);
-        // stdout carries protocol logs to the log file; stderr to the console
-        console.error(`research-scope-mcp ${version} listening (Streamable HTTP) on http://${bound}/mcp`);
-      });
-    })
-    .catch((err) => {
-      console.error(`HTTP transport startup failed: ${(err as Error).message}`);
-      process.exitCode = 1;
-    });
+        const payload = JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: (err as Error).message } });
+        if (!res.writableEnded) {
+          res.end(payload);
+        } else {
+          res.destroy();
+        }
+      }
+    })();
+  });
+  httpServer.listen(port, () => {
+    const addr = httpServer.address();
+    const bound = typeof addr === "object" && addr ? `${addr.address}:${addr.port}` : String(port);
+    // stdout carries protocol logs to the log file; stderr to the console
+    console.error(`research-scope-mcp ${version} listening (Streamable HTTP) on http://${bound}/mcp`);
+  });
 }
 
 /* --- entry -------------------------------------------------------- */

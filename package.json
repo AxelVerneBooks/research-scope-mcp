@@ -1,6 +1,6 @@
 {
   "name": "research-scope-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
   "type": "module",
   "license": "MIT",

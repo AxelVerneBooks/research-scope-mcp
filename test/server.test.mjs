@@ -98,6 +98,59 @@ test("initialize + tools/list exposes the four workflow tools", async () => {
   }
 });
 
+test("stateless HTTP transport: second request works with no session (regression: transport-per-request)", async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), "rsmcp-http-test-"));
+  const port = 40000 + Math.floor(Math.random() * 20000);
+  const child = spawn(
+    process.execPath,
+    [join(process.cwd(), "dist", "index.js"), "--http", "--port", String(port)],
+    { cwd: process.cwd(), env: { ...process.env, RESEARCH_SCOPE_DATA_DIR: dataDir }, stdio: ["ignore", "ignore", "inherit"] }
+  );
+  try {
+    // Shake hands with port-open polling (server prints "listening" to stderr, inherits here).
+    const base = `http://127.0.0.1:${port}/mcp`;
+    let up = false;
+    for (let i = 0; i < 40 && !up; i++) {
+      try {
+        await fetch(base, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "ping", params: {} }) });
+        up = true;
+      } catch {
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    assert.ok(up, `HTTP server on ${port} never opened`);
+
+    const post = async (payload) =>
+      fetch(base, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify(payload),
+      });
+    const parse = async (res) => {
+      const t = await res.text();
+      const dataLine = t.split("\n").find((l) => l.startsWith("data:"));
+      return JSON.parse(dataLine ? dataLine.slice(5).trim() : t);
+    };
+    // No mcp-session-id header is held between calls — this test is stateless on purpose.
+
+    // 1. initialize opens the door
+    const init = await parse(await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "http-test", version: "0" } } }));
+    assert.equal(init.result?.serverInfo?.name, "research-scope-mcp");
+
+    // 2/3. THE regression: further requests must NOT 500, even without any session
+    const listed = await parse(await post({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }));
+    assert.equal(listed.result?.tools?.length, 4, `tools/list broke: ${JSON.stringify(listed)}`);
+    const call = await parse(await post({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "plan_research", arguments: { scope: "http regression probe" } } }));
+    const plan = JSON.parse(call.result.content[0].text);
+    assert.ok(plan.killCriteria.length >= 1);
+    assert.ok(plan.primarySourceTargets.length >= 1);
+  } finally {
+    child.kill();
+    await once(child, "exit").catch(() => {});
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("full workflow: plan → fetch_and_score → build → check (live fetch, network required)", async () => {
   const client = StdioMcpClient.spawn();
   try {
