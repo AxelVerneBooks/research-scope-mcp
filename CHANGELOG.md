@@ -4,20 +4,24 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
-## Unreleased
+## [0.1.2] — 2026-10-17
 
 ### Fixed
 - **check_report no longer orphans the report shell's own template boilerplate.**
   The italic `_*_` instruction preamble and the `<!-- … -->` example comments were
   being counted as orphan claims in every fresh shell (surplus `orphanClaims` noise
-  alongside real findings). `extractClaims` now skips both. Not yet published —
-  registry versions are immutable, so this rides the next version bump.
+  alongside real findings). `extractClaims` now skips both.
 
 ### Added
 - `npm run demo:capture` (`tools/demo-capture.mjs`): reproducible stdio capture of
   the scripted 60-second demo run into
   `docs/marketing/demo-60s/run-capture.jsonl` (refuses to overwrite the
   published-capture transcript without `--force`); see README “Demo capture”.
+
+### Published
+- npm: `research-scope-mcp` — first npm publication (package metadata includes
+  `dist/`, README, and `server.json`; install becomes `npm install -g
+  research-scope-mcp` / `npx -y research-scope-mcp`).
 
 ## [0.1.1] — 2026-10-15
 
