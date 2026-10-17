@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http --port 3001",
-    "test": "npm run build && node --test test/server.test.mjs"
+    "test": "npm run build && node --test test/server.test.mjs",
+    "demo:capture": "npm run build && node tools/demo-capture.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

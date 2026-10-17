@@ -66,6 +66,19 @@ docker run --rm -i -p 3001:3001 research-scope-mcp --http --port 3001
 See [docs/runs/](docs/runs/) for two worked runs with inputs and outputs, and
 [docs/notes/](docs/notes/) for what to do when something times out or 401s.
 
+## Demo capture
+
+`npm run demo:capture` (or `node tools/demo-capture.mjs`) replays the scripted
+60-second demo flow against the shipped server — spawn `dist/index.js` over
+stdio with a fresh temp data dir, `plan_research` → `fetch_and_score` a .gov page
+(real fetch) → `build_report`, inject one cited claim plus one deliberately
+orphan claim, and confirm `check_report` refuses to bless it — writing each frame
+out as a `{t, dir, msg}` JSONL transcript. By default it targets
+[docs/marketing/demo-60s/run-capture.jsonl](docs/marketing/demo-60s/run-capture.jsonl)
+(the transcript the product-page demo player's footer sha256 is anchored to); it
+refuses to overwrite that file without `--force`. Requires network access for the
+one real fetch; repo `data/` is never touched.
+
 ## Scoring rubric
 
 | Dimension | Max | Notes |
