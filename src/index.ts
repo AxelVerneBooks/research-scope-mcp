@@ -124,6 +124,12 @@ function extractClaims(markdown: string): Array<{ claim: string; claimId: string
     const isBlockqualte = /^>/.test(trimmed);
     void isBlockqualte;
     if (!trimmed || isHeading) return;
+    // Template boilerplate never counts as a claim: the shell's own instruction
+    // preamble (italic _…_ lines) and HTML example comments are not authored
+    // findings, so check_report must not orphan them.
+    const isTemplateComment = trimmed.startsWith("<!--");
+    const isTemplatePreamble = trimmed.startsWith("_") && trimmed.endsWith("_");
+    if (isTemplateComment || isTemplatePreamble) return;
     const body = isListItem ? trimmed.slice(2) : trimmed;
     // only substantive assertion sentences
     if (body.length < 40) return;
