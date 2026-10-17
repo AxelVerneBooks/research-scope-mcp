@@ -51,3 +51,21 @@ moment — the "what this kit is" beat is the `false`, not a happy path.
 - `docs/marketing/demo-60s/run-capture.jsonl` — the raw run
 - `docs/marketing/demo-60s/demo.html` — the 60 s player
 - `docs/marketing/demo-60s/demo-60s.webm` — the recording
+
+## Short-form cuts (vertical 1080x1920, h264 yuv420p @5fps)
+
+| Cut | Length | Take |
+|---|---|---|
+| `cuts/cut1-what-it-does.mp4` | 24.1 s | the honest-failure story in one screen |
+| `cuts/cut2-the-honest-failure.mp4` | 16.8 s | FAIL verdict + orphan panel |
+| `cuts/cut3-setup-in-30s.mp4` | 34.0 s | setup-in-30s player (real npm ci capture) |
+
+cut3 production note (2026-10-16): rendered headlessly frame-sequence (puppeteer-core
+via `render-cut3.mjs`, 170 PNG frames @200ms → ffmpeg `framerate 5`) because the
+tab recorder locks a pre-resize viewport (1280x1387) and the setup player's
+below-fold PASS verdict + outro were never captured on screen-recorded takes.
+`demo-setup-vertical.html` got a parity fix in the same pass: `show()` now
+`scrollIntoView`s like its 60s sibling, so any future tab recording shows the
+verdict + outro too. To re-render: install puppeteer-core into a scratch dir, point
+`render-cut3.mjs`'s import at its `lib/esm/puppeteer/puppeteer-core.js`, serve `docs/`
+on :8899, run `node render-cut3.mjs`, assemble with `-framerate 5 -i …/f%04d.png`.

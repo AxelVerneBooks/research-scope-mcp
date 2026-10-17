@@ -46,6 +46,12 @@ Every publish needs a **unique new version** and metadata is immutable. Bump
 the bump in `CHANGELOG.md`), build, test, then publish. Errors are never "fixed" —
 they are *superseded* by the next version.
 
+**The mechanical runbook:** [docs/publication/release-checklist-version-bump.md]
+(docs/publication/release-checklist-version-bump.md) — the complete 8-surface
+version list, per-step commands with expected output, and the traps hit on 0.1.2
+(premature CHANGELOG claims; expired publisher token). Follow it top-to-bottom for
+each release.
+
 ## After publish — directory spread (from `gumroad-tracks/runbook-and-pricing.md`)
 
 1. official registry (this step) → 2. Glama "Add MCP Server" (admin access +

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>research-scope-mcp — setup in 30 seconds (vertical)</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b0e14; color: #d6deeb; font: 19px/1.5 "SF Mono", ui-monospace, Menlo, monospace; }
+  #stage { max-width: 100%; margin: 0 auto; padding: 44px 36px 110px; }
+  .scene { display: none; margin: 0 0 18px; animation: fadein .5s; }
+  .scene.live { display: block; }
+  .scene.old { display: block; opacity: .38; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none;} }
+  .cmd { color: #7fd4ff; white-space: pre-wrap; }
+  .cmd::before { content: "$ "; color: #586a85; }
+  .lbl { color: #586a85; letter-spacing: .12em; font-size: 12px; text-transform: uppercase; margin-bottom: 6px; }
+  .json { white-space: pre-wrap; color: #b9c4d4; }
+  .k { color: #c792ea; }
+  .num { color: #ffcb6b; }
+  .ok { color: #82e0aa; }
+  .pass { font-size: 26px; padding: 14px 18px; border-radius: 8px; background: rgba(130,224,170,.12); border: 1px solid rgba(130,224,170,.5); animation: pop .35s; }
+  @keyframes pop { from { transform: scale(.96); opacity: 0;} to { transform: none; opacity: 1;} }
+  .tim { color: #ffcb6b; font-weight: 700; }
+  h1 { font-size: 50px; margin: 20vh 0 16px; text-align: center; font-weight: 600; }
+  .sub { text-align: center; color: #7d8ca3; font-size: 16px; }
+  .outro { text-align: center; margin-top: 12vh; }
+  .outro .big { font-size: 32px; color: #fff; }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 18px; font-size: 13px; color: #586a85; background: rgba(11,14,20,.9); border-top: 1px solid #1d2430; }
+  .cursor { display: inline-block; width: 9px; height: 1.1em; background: #7fd4ff; vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .wait { color: #586a85; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0-3s TITLE -->
+  <div class="scene" id="s0">
+    <h1>unzip&nbsp;→&nbsp;npm&nbsp;→&nbsp;done</h1>
+    <div class="sub">research-scope-mcp — setup in 30 seconds<br>a live first-run capture: real zip, real npm install, real first call</div>
+  </div>
+
+  <!-- 1 · prereqs + unzip -->
+  <div class="scene" id="s1"><div class="lbl">1 · prerequisites + the purchased zip</div>
+    <div class="cmd">node --version</div>
+    <div class="json" id="s1out"></div>
+    <div class="cmd" id="s1unzip">unzip research-scope-starter.zip</div>
+    <div class="json" id="s1out2"></div>
+  </div>
+
+  <!-- 2 · npm ci -->
+  <div class="scene" id="s2"><div class="lbl">2 · the npm install (real, cold dir)</div>
+    <div class="cmd">npm ci</div>
+    <div class="wait" id="s2wait">installing…</div>
+    <div class="json" id="s2out"></div>
+  </div>
+
+  <!-- 3 · client config -->
+  <div class="scene" id="s3"><div class="lbl">3 · add to the client (claude-code.json, verbatim)</div>
+    <div class="json" id="s3out"></div>
+  </div>
+
+  <!-- 4 · first run -->
+  <div class="scene" id="s4"><div class="lbl">4 · first call: “plan_research: verify install”</div>
+    <div class="json" id="s4out"></div>
+    <div class="wait" id="s4wait">calling…</div>
+    <div class="pass" id="verdict" style="display:none">PASS — installation verified</div>
+  </div>
+
+  <!-- OUTRO -->
+  <div class="scene" id="s5"><div class="outro">
+    <div class="big">Setup: <span class="tim">1.65 s</span> wall clock.</div>
+    <div class="sub" style="margin-top:10px">No build step on the buyer side · no API keys · no account<br>then: <span class="ok">plan → score → check</span>, orphan claims never pass.</div>
+  </div></div>
+
+</div>
+<footer>captured first run of the $9 Starter zip · npm ci 635 ms, 98 packages · sha256 e4a852…25d14 · every line above is real output</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+
+// ---- verbatim excerpts from setup-capture.jsonl ----
+const nodeOut = `v26.7.0`;
+const unzipOut = `30 files · dist/ ships prebuilt · no node_modules`;
+const npmOut =
+`added 98 packages, and audited 99 packages in 635ms
+
+34 packages are looking for funding
+  run \`npm fund\` for details
+
+found 0 vulnerabilities
+→ <span class="tim">0.95 s</span> total (warm cache)`;
+
+const clientCfg =
+`{
+  "mcpServers": {
+    "research-scope": {
+      "command": "npx",
+      "args": ["-y", "research-scope-mcp"]
+    }
+  }
+}`;
+
+const firstRun =
+`<span class="cmd" style="white-space:nowrap">tools → build_report, check_report, fetch_and_score, plan_research</span>
+
+<span class="k">plan_research</span> { scope: "verify install" } →
+
+{
+  responseKeys: [
+    <span class="ok">primarySourceTargets</span>,
+    <span class="ok">corroboratingTargets</span>,
+    <span class="ok">killCriteria</span>
+  ]
+}`;
+
+// ---- timeline → ~30 s ----
+const timeline = [
+  { t: 0,  fn: () => show("s0", true) },
+  { t: 3,  fn: () => { demote("s0"); show("s1", true); } },
+  { t: 4,  fn: () => { $("s1out").innerHTML = nodeOut; } },
+  { t: 6,  fn: () => { $("s1out2").innerHTML = unzipOut; typeDone($("s1out2")); } },
+  { t: 9,  fn: () => { demote("s1"); show("s2", true); } },
+  { t: 12, fn: () => { $("s2wait").remove(); $("s2out").innerHTML = npmOut; } },
+  { t: 17, fn: () => { demote("s2"); show("s3", true); typeInto($("s3out"), clientCfg, 2800); } },
+  { t: 23, fn: () => { demote("s3"); show("s4", true); $("s4out").innerHTML = firstRun; } },
+  { t: 27, fn: () => { $("s4wait").remove(); $("verdict").style.display = "block"; } },
+  { t: 29, fn: () => { demote("s4"); show("s5", true); } },
+];
+
+function show(id, live) { const el = $(id); el.classList.add(live ? "live" : "old"); if (live) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }
+function demote(id) { const el = $(id); el.classList.remove("live"); el.classList.add("old"); }
+function typeDone(el) { el.classList.add("ok"); }
+function typeInto(container, html, ms) {
+  const tmp = document.createElement("div"); tmp.innerHTML = html;
+  const text = tmp.textContent;
+  const start = performance.now();
+  (function step(now) {
+    const p = Math.min(1, (now - start) / ms);
+    const visible = text.slice(0, Math.round(p * text.length));
+    container.innerHTML = visible + '<span class="cursor"></span>';
+    if (p < 1) requestAnimationFrame(step);
+    else container.innerHTML = html;
+  })(start);
+}
+
+const timers = timeline.map(ev => setTimeout(ev.fn, ev.t * 1000));
+</script>
+</body>
+</html>
