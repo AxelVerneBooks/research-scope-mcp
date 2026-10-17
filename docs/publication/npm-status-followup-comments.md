@@ -1,13 +1,10 @@
 # npm status follow-up comments — ready to paste (do NOT post until told)
 
-Both open submissions carry the "npm tab in progress" caveat from 2026-10-15.
-Registry **0.1.2 published 2026-10-17** (immutable-metadata rule satisfied);
-npm 0.1.2 is **prepared, dry-run verified, but blocked by missing npm
-credentials** (ENEEDAUTH — no npm account installed on the build machine;
-user action: `npm adduser` or provide a publish token, then `npm publish`).
-
-Use **A now** (honest status), switch to **B the moment npm goes live**.
-Paste as a normal comment on each issue; no labels needed.
+**STATE SUPERSEDED 2026-10-17:** npm 0.1.2 is **confirmed LIVE**
+(`dist-tags.latest: 0.1.2`, verified against the registry API). The B-comment
+below is now the live truth and is the one to post on the two open issues;
+comment A ("publication in progress") is retired — do not post it anywhere.
+The B text already names the correct version and install commands.
 
 ## A · post now (honest status update)
 
