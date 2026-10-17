@@ -18,10 +18,14 @@ metadata is immutable, so fix errors by publishing a *new* version).
   `docs/marketing/demo-60s/run-capture.jsonl` (refuses to overwrite the
   published-capture transcript without `--force`); see README “Demo capture”.
 
-### Published
-- npm: `research-scope-mcp` — first npm publication (package metadata includes
-  `dist/`, README, and `server.json`; install becomes `npm install -g
-  research-scope-mcp` / `npx -y research-scope-mcp`).
+### Pending
+- npm: `research-scope-mcp` — version 0.1.2 is **prepared and dry-run verified**
+  (10-file package: `dist/`, README, `server.json`) but the actual publish was
+  **blocked 2026-10-17 by missing npm credentials** (ENEEDAUTH; no npm account
+  logged in on the build machine). Unblocks with `npm adduser`/a publish token,
+  then `npm publish`. Until then the registry install path stands:
+  repo clone + `npm ci && npm run build`, and the open Cline/mcp.so submissions
+  keep their “npm tab in progress” caveat.
 
 ## [0.1.1] — 2026-10-15
 
