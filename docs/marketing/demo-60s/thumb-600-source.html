@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>money frame 600</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { width: 600px; height: 600px; margin: 0; background: #0b0e14; color: #d6deeb; font: 16px/1.45 "SF Mono", ui-monospace, Menlo, monospace; }
+  #card { width: 600px; height: 600px; padding: 30px 34px 24px; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; justify-content: space-between; letter-spacing: .14em; font-size: 11px; color: #586a85; text-transform: uppercase; }
+  .brand b { color: #7fd4ff; font-weight: 700; }
+  .lbl { color: #586a85; letter-spacing: .12em; font-size: 11px; text-transform: uppercase; margin: 26px 0 8px; }
+  .cmd { color: #7fd4ff; white-space: pre-wrap; font-size: 15px; }
+  .cmd::before { content: "$ "; color: #586a85; }
+  .json { white-space: pre-wrap; color: #b9c4d4; font-size: 14.5px; margin-top: 10px; flex: 1; }
+  .k { color: #c792ea; }
+  .num { color: #ffcb6b; }
+  .fail { color: #ff5370; font-weight: 700; }
+  .v { color: #82e0aa; }
+  .orphan { border-left: 3px solid #ff5370; background: rgba(255,83,112,.08); padding: 8px 12px; margin: 8px 0; border-radius: 4px; color: #d6deeb; }
+  #verdict { display: block; font-size: 25px; padding: 16px 20px; border-radius: 8px; background: rgba(255,83,112,.12); border: 1px solid rgba(255,83,112,.5); color: #ffb3c0; }
+  #verdict b { color: #ff5370; }
+  .foot { margin-top: 14px; font-size: 11px; color: #586a85; display: flex; justify-content: space-between; }
+  .foot .ok { color: #82e0aa; }
+</style>
+</head>
+<body>
+<div id="card">
+  <div class="brand"><span><b>research-scope-mcp</b> · source-quality scoring</span><span>captured run</span></div>
+
+  <div class="lbl">check_report · the honest moment</div>
+  <div class="cmd">check_report({ report_path: "…/report-14af333e.md" })</div>
+
+  <div class="json">{
+  <span class="k">pass</span>: <span class="fail">false</span>,
+  <span class="k">claimsFound</span>: <span class="num">2</span>,  <span class="k">claimsCited</span>: <span class="num">1</span>,
+  <span class="k">orphanClaims</span>: [
+    { <span class="k">claimId</span>: <span class="num">"C6"</span>,
+      <span class="k">claim</span>: "The platform-by-platform comparison shows retention varies far more between plans than the vendor's marketing concedes.",
+      sourceUrls: [] }
+  ],
+}</div>
+
+  <div class="orphan">orphan claim <span class="fail">← no [Sn]</span></div>
+
+  <div id="verdict"><b>FAIL</b> — orphan claims above cite no scored source; fill or remove them</div>
+
+  <div class="foot"><span>run-capture.jsonl · sha256 3c752cdd…</span><span class="ok">errors, never a pass</span></div>
+</div>
+</body>
+</html>
