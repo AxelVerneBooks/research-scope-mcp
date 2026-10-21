@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "research-scope": {
+      "command": "npx",
+      "args": ["-y", "research-scope-mcp"],
+      "env": {
+        "RESEARCH_SCOPE_DATA_DIR": "/absolute/path/to/research-reports"
+      }
+    }
+  }
+}

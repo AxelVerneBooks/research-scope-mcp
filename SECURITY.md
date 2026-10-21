@@ -19,8 +19,12 @@ issues.
 - `fetch_and_score` performs outbound HTTP GETs to caller-supplied URLs. In
   zero-trust environments, run the server inside a network-restricted container
   (the provided [docker/Dockerfile](docker/Dockerfile) exposes only the MCP port).
-- The HTTP transport currently serves a single session without auth. Do **not**
-  expose it publicly without an auth proxy in front; supply-chain-wise, the
+- The HTTP transport is stateless and has **no authentication**. It binds to
+  `127.0.0.1` unless `--host` says otherwise. Do **not** expose it publicly without
+  an authenticating proxy in front: any caller can make the server fetch URLs and
+  can point `check_report`'s `report_path` at local files. Supply-chain-wise, a
   registry `remotes[]` entry must point at a host you control (see `server.json`).
+- `fetch_and_score` accepts only `http://` and `https://` URLs, aborts after 15 s
+  and reads at most 5 MB per response.
 - Report files are written under `RESEARCH_SCOPE_DATA_DIR` (default `./data`) with
   no secrets embedded — scrape inputs are the only external data stored.

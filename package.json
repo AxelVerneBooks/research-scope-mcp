@@ -2,11 +2,34 @@
   "name": "research-scope-mcp",
   "version": "0.1.2",
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
-  "type": "module",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "research",
+    "citations",
+    "source-scoring",
+    "claude",
+    "cursor"
+  ],
+  "author": "Axel Verne (https://axelverne.com)",
   "license": "MIT",
+  "homepage": "https://github.com/AxelVerneBooks/research-scope-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AxelVerneBooks/research-scope-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AxelVerneBooks/research-scope-mcp/issues"
+  },
+  "type": "module",
+  "bin": {
+    "research-scope-mcp": "dist/index.js"
+  },
   "files": [
     "dist",
     "README.md",
+    "LICENSE",
     "server.json"
   ],
   "engines": {
@@ -14,17 +37,27 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . && npm run typecheck",
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http --port 3001",
-    "test": "npm run build && node --test test/server.test.mjs",
+    "pretest": "npm run build",
+    "test": "node --test test/score.test.mjs test/fetch.test.mjs test/report.test.mjs test/cli.test.mjs test/server.test.mjs test/transports.test.mjs",
+    "test:live": "npm run build && RESEARCH_SCOPE_LIVE=1 node --test test/live.test.mjs",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
     "demo:capture": "npm run build && node tools/demo-capture.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",
-    "zod": "^3.24.0"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.0"
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.72.0"
   }
 }

@@ -200,6 +200,8 @@ try {
   console.error(`# capture FAILED: ${err.message}`);
   try {
     await rm(dataDir, { recursive: true, force: true });
-  } catch {}
+  } catch {
+    // best-effort cleanup
+  }
   process.exit(1);
 }
