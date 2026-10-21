@@ -1,202 +1,214 @@
 /**
- * Integration test — launches the built stdio server and drives the full workflow:
- * plan_research → fetch_and_score (real network fetch) → build_report → check_report.
- * Run: npm test
+ * Tool-level tests: a real MCP client talks to an in-process server; sources
+ * are served by a local fixture server, so no network access is needed.
  */
-import { test } from "node:test";
+import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { once } from "node:events";
 
-const DATA_DIR = mkdtempSync(join(tmpdir(), "rsmcp-test-"));
+import { createState } from "../dist/server.js";
+import { version } from "../dist/version.js";
+import { connectInMemory, text, json } from "./helpers/client.mjs";
+import { startFixtureServer, articleHtml } from "./helpers/fixtures.mjs";
 
-/** Minimal MCP stdio client for the test: JSON-RPC line responses per request id. */
-class StdioMcpClient {
-  #child;
-  #buf = "";
-  #pending = new Map();
-  constructor(child) {
-    this.#child = child;
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      this.#buf += chunk;
-      let idx;
-      while ((idx = this.#buf.indexOf("\n")) >= 0) {
-        const line = this.#buf.slice(0, idx).trim();
-        this.#buf = this.#buf.slice(idx + 1);
-        if (!line) continue;
-        let msg;
-        try {
-          msg = JSON.parse(line);
-        } catch {
-          continue; // tolerate interleaved non-JSON lines (banner noise)
-        }
-        if (msg.id !== undefined && this.#pending.has(msg.id)) {
-          this.#pending.get(msg.id)(msg);
-          this.#pending.delete(msg.id);
-        }
-      }
-    });
-  }
-  static spawn() {
-    const child = spawn(process.execPath, [join(process.cwd(), "dist", "index.js")], {
-      cwd: process.cwd(),
-      env: { ...process.env, RESEARCH_SCOPE_DATA_DIR: DATA_DIR },
-      stdio: ["pipe", "pipe", "inherit"],
-    });
-    return new this(child);
-  }
-  request(method, params, timeoutMs = 30000) {
-    return new Promise((resolve, reject) => {
-      const id = Math.floor(Math.random() * 1e9);
-      const timer = setTimeout(() => {
-        this.#pending.delete(id);
-        reject(new Error(`timeout waiting for ${method}`));
-      }, timeoutMs);
-      this.#pending.set(id, (msg) => {
-        clearTimeout(timer);
-        if (msg.error) reject(new Error(`${method} error: ${JSON.stringify(msg.error)}`));
-        else resolve(msg.result);
-      });
-      this.#child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
-    });
-  }
-  notify(method, params) {
-    this.#child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
-  }
-  async close() {
-    this.#child.stdin.end();
-    this.#child.kill();
-    await once(this.#child, "exit").catch(() => {});
-  }
-}
+let fx;
+let dataDir;
+let state;
+let conn;
 
-/** Pull the first JSON text payload out of an MCP tool result. */
-function textPayload(result) {
-  assert.ok(result?.content?.[0]?.text, `no text content in ${JSON.stringify(result)}`);
-  return result.content[0].text;
-}
-
-test("initialize + tools/list exposes the four workflow tools", async () => {
-  const client = StdioMcpClient.spawn();
-  try {
-    const init = await client.request("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "test-client", version: "0.0.1" },
-    });
-    assert.equal(init.serverInfo.name, "research-scope-mcp");
-    client.notify("notifications/initialized", {});
-    const tools = await client.request("tools/list", {});
-    const names = tools.tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["build_report", "check_report", "fetch_and_score", "plan_research"]);
-  } finally {
-    await client.close();
-  }
+before(async () => {
+  fx = await startFixtureServer({
+    "/article": { body: articleHtml({ title: "Agency announcement" }) },
+    "/second": { body: articleHtml({ title: "Second source", body: "Sponsored by Acme Corp." }) },
+    "/moved": (_req, res) => res.writeHead(301, { location: "/article" }).end(),
+    "/gone": { status: 404, body: "<title>Not here</title>" },
+    "/slow": (_req, res) => setTimeout(() => res.writeHead(200).end("late"), 2000),
+  });
+  dataDir = mkdtempSync(join(tmpdir(), "rsmcp-server-test-"));
+  state = createState({ dataDir, fetchOptions: { timeoutMs: 500 } });
+  conn = await connectInMemory(state);
 });
 
-test("stateless HTTP transport: second request works with no session (regression: transport-per-request)", async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), "rsmcp-http-test-"));
-  const port = 40000 + Math.floor(Math.random() * 20000);
-  const child = spawn(
-    process.execPath,
-    [join(process.cwd(), "dist", "index.js"), "--http", "--port", String(port)],
-    { cwd: process.cwd(), env: { ...process.env, RESEARCH_SCOPE_DATA_DIR: dataDir }, stdio: ["ignore", "ignore", "inherit"] }
-  );
-  try {
-    // Shake hands with port-open polling (server prints "listening" to stderr, inherits here).
-    const base = `http://127.0.0.1:${port}/mcp`;
-    let up = false;
-    for (let i = 0; i < 40 && !up; i++) {
-      try {
-        await fetch(base, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "ping", params: {} }) });
-        up = true;
-      } catch {
-        await new Promise((r) => setTimeout(r, 250));
-      }
+after(async () => {
+  await conn.close();
+  await fx.close();
+  rmSync(dataDir, { recursive: true, force: true });
+});
+
+const call = (name, args) => conn.client.callTool({ name, arguments: args });
+
+describe("server metadata", () => {
+  test("advertises name, version and workflow instructions", () => {
+    assert.deepEqual(conn.client.getServerVersion(), { name: "research-scope-mcp", version });
+    assert.match(conn.client.getInstructions(), /plan_research first/);
+  });
+
+  test("lists the four workflow tools with input schemas", async () => {
+    const { tools } = await conn.client.listTools();
+    assert.deepEqual(tools.map((t) => t.name).sort(), ["build_report", "check_report", "fetch_and_score", "plan_research"]);
+    const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+    assert.deepEqual(byName.plan_research.inputSchema.required, ["scope"]);
+    assert.deepEqual(byName.fetch_and_score.inputSchema.required, ["source_url"]);
+    assert.deepEqual(byName.build_report.inputSchema.required.sort(), ["sources", "topic"]);
+    for (const t of tools) assert.ok(t.description.length > 20, `${t.name} needs a description`);
+  });
+});
+
+describe("plan_research", () => {
+  test("returns targets and kill criteria", async () => {
+    const plan = json(await call("plan_research", { scope: "verify vendor claim about exam change" }));
+    assert.equal(plan.scope, "verify vendor claim about exam change");
+    assert.equal(plan.primarySourceTargets.length, 2);
+    assert.equal(plan.corroboratingTargets.length, 2);
+    assert.ok(plan.killCriteria.length >= 3);
+    assert.deepEqual(plan.domainHints, [".gov", ".edu", "arxiv.org", "press"]);
+  });
+
+  test("uses all supplied domain hints", async () => {
+    const plan = json(await call("plan_research", { scope: "battery recall", domain_hints: ["cpsc.gov", " nhtsa.gov ", ""] }));
+    assert.deepEqual(plan.domainHints, ["cpsc.gov", "nhtsa.gov"]);
+    assert.match(plan.primarySourceTargets[1].what, /cpsc\.gov, nhtsa\.gov/);
+  });
+
+  test("rejects a too-short scope", async () => {
+    const res = await call("plan_research", { scope: "  x " });
+    assert.equal(res.isError, true);
+  });
+});
+
+describe("fetch_and_score", () => {
+  test("scores a fixture page and returns the explainable breakdown", async () => {
+    const s = json(await call("fetch_and_score", { source_url: fx.url("/article") }));
+    assert.equal(s.url, fx.url("/article"));
+    assert.equal(s.publishedAt, "2026-10-01");
+    assert.equal(s.breakdown.length, 5);
+    assert.equal(s.score, s.breakdown.reduce((n, b) => n + b.points, 0));
+    assert.ok(state.scores.has(fx.url("/article")));
+  });
+
+  test("registers redirects under both the requested and the final URL", async () => {
+    const s = json(await call("fetch_and_score", { source_url: fx.url("/moved") }));
+    assert.equal(s.url, fx.url("/article"));
+    assert.ok(state.scores.has(fx.url("/moved")));
+  });
+
+  test("dead links score 0 and are still registered", async () => {
+    const s = json(await call("fetch_and_score", { source_url: fx.url("/gone") }));
+    assert.equal(s.score, 0);
+    assert.ok(s.flags.includes("http-404"));
+    assert.ok(state.scores.has(fx.url("/gone")));
+  });
+
+  test("timeouts return a tool error and register nothing", async () => {
+    const res = await call("fetch_and_score", { source_url: fx.url("/slow") });
+    assert.equal(res.isError, true);
+    assert.match(text(res), /Timed out after 500ms/);
+    assert.ok(!state.scores.has(fx.url("/slow")));
+  });
+
+  test("rejects non-http(s) URLs", async () => {
+    for (const source_url of ["file:///etc/passwd", "data:text/html,<title>x</title>", "not-a-url"]) {
+      const res = await call("fetch_and_score", { source_url });
+      assert.equal(res.isError, true, source_url);
     }
-    assert.ok(up, `HTTP server on ${port} never opened`);
-
-    const post = async (payload) =>
-      fetch(base, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
-        body: JSON.stringify(payload),
-      });
-    const parse = async (res) => {
-      const t = await res.text();
-      const dataLine = t.split("\n").find((l) => l.startsWith("data:"));
-      return JSON.parse(dataLine ? dataLine.slice(5).trim() : t);
-    };
-    // No mcp-session-id header is held between calls — this test is stateless on purpose.
-
-    // 1. initialize opens the door
-    const init = await parse(await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "http-test", version: "0" } } }));
-    assert.equal(init.result?.serverInfo?.name, "research-scope-mcp");
-
-    // 2/3. THE regression: further requests must NOT 500, even without any session
-    const listed = await parse(await post({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }));
-    assert.equal(listed.result?.tools?.length, 4, `tools/list broke: ${JSON.stringify(listed)}`);
-    const call = await parse(await post({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "plan_research", arguments: { scope: "http regression probe" } } }));
-    const plan = JSON.parse(call.result.content[0].text);
-    assert.ok(plan.killCriteria.length >= 1);
-    assert.ok(plan.primarySourceTargets.length >= 1);
-  } finally {
-    child.kill();
-    await once(child, "exit").catch(() => {});
-    rmSync(dataDir, { recursive: true, force: true });
-  }
+  });
 });
 
-test("full workflow: plan → fetch_and_score → build → check (live fetch, network required)", async () => {
-  const client = StdioMcpClient.spawn();
-  try {
-    await client.request("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "test-client", version: "0.0.1" },
-    });
-    client.notify("notifications/initialized", {});
+describe("build_report + check_report", () => {
+  let built;
+  let reportId;
+  let reportPath;
 
-    // 1. plan
-    const plan = JSON.parse(textPayload(await client.request("tools/call", { name: "plan_research", arguments: { scope: "verify example vendor claim about exam-format change" } })));
-    assert.ok(plan.primarySourceTargets.length >= 1);
-    assert.ok(plan.killCriteria.length >= 1);
+  before(async () => {
+    await call("fetch_and_score", { source_url: fx.url("/article") });
+    await call("fetch_and_score", { source_url: fx.url("/second") });
+    built = text(await call("build_report", { topic: "Fixture topic", sources: [fx.url("/article"), fx.url("/second")] }));
+    [, reportId, reportPath] = built.match(/Report shell (\S+) saved to (\S+\.md)/);
+  });
 
-    // 2. fetch_and_score — real (small, stable, primary-host) page; prefix-match union honors both URLs
-    const scored = JSON.parse(textPayload(await client.request("tools/call", { name: "fetch_and_score", arguments: { source_url: "https://www.nhtsa.gov/" } })));
-    assert.ok(typeof scored.score === "number" && scored.score > 0, `expected positive score, got ${JSON.stringify(scored)}`);
-    assert.ok(Array.isArray(scored.flags));
-    assert.ok(scored.breakdown.length >= 4);
+  test("saves the shell under <dataDir>/reports and returns the registry", () => {
+    assert.ok(reportPath.startsWith(join(dataDir, "reports")));
+    assert.ok(existsSync(reportPath));
+    const md = readFileSync(reportPath, "utf8");
+    assert.match(md, /^# Research report — Fixture topic/);
+    assert.match(built, new RegExp(`\\[S1\\] ${fx.url("/article")}`));
+    assert.match(built, new RegExp(`\\[S2\\] ${fx.url("/second")}`));
+    assert.match(built, new RegExp(`report_id "${reportId}"`));
+  });
 
-    // 3. build_report with the scored URL (registry is dual-indexed)
-    const built = textPayload(await client.request("tools/call", {
-      name: "build_report",
-      arguments: { topic: "Test report", sources: ["https://www.nhtsa.gov/"] },
-    }));
-    assert.match(built, /Citation registry/);
-    assert.match(built, /report-.*\.md/);
+  test("refuses unscored sources and names them", async () => {
+    const res = await call("build_report", { topic: "Bad", sources: [fx.url("/article"), "https://never-scored.example.com/"] });
+    assert.equal(res.isError, true);
+    assert.match(text(res), /never scored[\s\S]*never-scored\.example\.com/);
+  });
 
-    // unscored sources must be refused
-    const refused = await client.request("tools/call", {
-      name: "build_report",
-      arguments: { topic: "Bad", sources: ["https://never-scored.example.com/"] },
-    });
-    assert.equal(refused.isError, true);
-    assert.match(textPayload(refused), /never scored/);
+  test("lists a URL and its redirect target once", async () => {
+    await call("fetch_and_score", { source_url: fx.url("/moved") });
+    const out = text(await call("build_report", { topic: "Dedup", sources: [fx.url("/moved"), fx.url("/article")] }));
+    assert.match(out, /^\[S1\] /m);
+    assert.doesNotMatch(out, /^\[S2\] /m);
+  });
 
-    // 4. check_report — find the report file path from the built text and use report_path
-    const m = built.match(/saved to (\S+\.md)/);
-    assert.ok(m, "built output should name the report path");
-    const check = JSON.parse(textPayload(await client.request("tools/call", { name: "check_report", arguments: { report_path: m[1] } })));
-    // fresh shell has no substantive claims yet → FAIL with instructions (stub lines excluded)
-    assert.equal(check.pass, false);
-    assert.match(check.verdict, /FAIL|no claims/i);
-  } finally {
-    await client.close();
-  }
-  rmSync(DATA_DIR, { recursive: true, force: true });
+  test("keeps a multi-line topic on the title line", async () => {
+    const out = text(await call("build_report", { topic: "Line one\n## Injected heading", sources: [fx.url("/article")] }));
+    assert.match(out, /# Research report — Line one ## Injected heading\n/);
+  });
+
+  test("a fresh shell fails by report_id", async () => {
+    const r = json(await call("check_report", { report_id: reportId }));
+    assert.equal(r.report, reportId);
+    assert.equal(r.pass, false);
+    assert.equal(r.claimsFound, 0);
+  });
+
+  test("check_report by report_id sees edits made to the saved file (regression)", async () => {
+    const md = readFileSync(reportPath, "utf8");
+    writeFileSync(
+      reportPath,
+      md.replace("\n## Citation registry\n", "\n- The agency announced the rule change in its October notice [S1].\n- A sponsored summary repeats the claim without new evidence [S2].\n\n## Citation registry\n")
+    );
+    const r = json(await call("check_report", { report_id: reportId }));
+    assert.equal(r.pass, true, r.verdict);
+    assert.equal(r.claimsFound, 2);
+  });
+
+  test("check_report by report_path flags orphans and unknown citations", async () => {
+    const md = readFileSync(reportPath, "utf8");
+    const edited = join(dataDir, "edited.md");
+    writeFileSync(edited, md.replace("\n## Citation registry\n", "\n- A claim with no citation that should be flagged as orphan.\n- A claim citing a source that was never registered here [S5].\n\n## Citation registry\n"));
+    const r = json(await call("check_report", { report_path: edited }));
+    assert.equal(r.pass, false);
+    assert.equal(r.orphanClaims.length, 2);
+    assert.deepEqual(r.unknownCitations.map((u) => u.citations), [["S5"]]);
+  });
+
+  test("check_report by report_id works after a restart (fresh state, same data dir)", async () => {
+    const fresh = await connectInMemory(createState({ dataDir }));
+    try {
+      const r = json(await fresh.client.callTool({ name: "check_report", arguments: { report_id: reportId } }));
+      assert.equal(r.pass, true, r.verdict);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  test("check_report errors", async () => {
+    const missingArgs = await call("check_report", {});
+    assert.equal(missingArgs.isError, true);
+    assert.match(text(missingArgs), /Provide either report_id/);
+
+    const unknown = await call("check_report", { report_id: "deadbeef" });
+    assert.equal(unknown.isError, true);
+    assert.match(text(unknown), /Unknown report_id "deadbeef"/);
+
+    const traversal = await call("check_report", { report_id: "../../etc/passwd" });
+    assert.equal(traversal.isError, true);
+    assert.match(text(traversal), /Invalid report_id/);
+
+    const noFile = await call("check_report", { report_path: join(dataDir, "nope.md") });
+    assert.equal(noFile.isError, true);
+    assert.match(text(noFile), /Report file not found/);
+  });
 });
