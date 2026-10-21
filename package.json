@@ -4,6 +4,27 @@
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
   "type": "module",
   "license": "MIT",
+  "author": "Axel Verne (https://axelverne.com)",
+  "homepage": "https://github.com/AxelVerneBooks/research-scope-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AxelVerneBooks/research-scope-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AxelVerneBooks/research-scope-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "research",
+    "citations",
+    "source-scoring",
+    "claude"
+  ],
+  "bin": {
+    "research-scope-mcp": "dist/index.js"
+  },
   "files": [
     "dist",
     "README.md",
@@ -16,7 +37,11 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http --port 3001",
-    "test": "npm run build && node --test test/server.test.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:network": "npm run build && RUN_NETWORK_TESTS=1 node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build",
     "demo:capture": "npm run build && node tools/demo-capture.mjs"
   },
   "dependencies": {
@@ -24,7 +49,11 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.0"
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.72.0"
   }
 }

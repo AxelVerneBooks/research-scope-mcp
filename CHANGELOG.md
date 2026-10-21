@@ -4,6 +4,58 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Fixed
+- **`npx research-scope-mcp` now works**: `package.json` had no `bin` entry, so the
+  documented `npx`/global-install commands could not start the server. Added `bin`
+  and a node shebang.
+- **Every page looked "published today"**: the freshness check read the HTTP `Date`
+  response header (the time the response was generated). It is now ignored; the
+  date comes from the page's own `article:published_time` / `datePublished` /
+  `<time datetime>` declaration, then `Last-Modified`, then the text.
+- **`check_report` passed claims citing nonexistent sources**: a claim citing `[S9]`
+  in a three-source report counted as cited. Citations are now validated against the
+  report's own citation registry and reported as `unknownCitations`.
+- **`check_report(report_id)` checked the stale shell**: it read the in-memory
+  markdown from `build_report`, ignoring every edit made to the file. It now reads
+  the file on disk, and ids keep working after a server restart.
+- **Score breakdown didn't add up**: for secondary sources the outbound-citation
+  points were added to the score but reported as 0 in the breakdown. Breakdown
+  points now always sum to the score.
+- `isPrimaryHost` suffix matching was loose (e.g. `CourtListener` entry was never
+  matched); rewritten with exact domain/suffix rules.
+- `fetch_and_score` returns a clear tool error for unreachable hosts and timeouts,
+  refuses non-http(s) URLs, and caps response bodies at 5 MB.
+- HTML entities are decoded in a single pass (`&amp;lt;` used to double-decode to
+  `<`), and numeric entities such as `&#8212;` are now decoded.
+- `build_report` de-duplicates sources listed twice or reached via redirect.
+
+### Security
+- The HTTP transport now binds to `127.0.0.1` by default (`--host` /
+  `RESEARCH_SCOPE_HOST` to change; the Docker image passes `--host 0.0.0.0`).
+  Previously it listened on all interfaces with no authentication.
+- Over HTTP, `check_report` only reads report files inside the data directory
+  (previously any readable file path could be passed, echoing its lines back).
+- Removed the README claim that unauthenticated HTTP requests receive a 401: no
+  auth layer exists; deploy behind an authenticating reverse proxy.
+
+### Added
+- Automated test suite (61 tests): scorer and report unit tests, in-process tool
+  tests against a local fixture web server, and end-to-end stdio/HTTP CLI tests.
+  `npm run test:network` adds the live-internet fetch test.
+- GitHub Actions CI: lint + typecheck, tests on Node 20/22/24, Docker build with a
+  health check.
+- ESLint (typescript-eslint) with `npm run lint`; `npm run typecheck`.
+- `--help`, `--version`, `--host`; `GET /healthz`; non-`/mcp` paths return 404.
+- Tool annotations (`readOnlyHint`, `openWorldHint`, …) on all four tools.
+- README: client setup for Claude Desktop, Claude Code and Cursor, example
+  session, configuration reference, badges.
+
+### Changed
+- Source split into `server.ts` (tools + HTTP handler), `report.ts`, `fetch.ts`
+  and a thin `index.ts` CLI entry.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed
