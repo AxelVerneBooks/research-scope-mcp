@@ -1,5 +1,5 @@
 /**
- * research-scope-mcp — source-quality scoring (v0.1.0)
+ * research-scope-mcp — source-quality scoring
  *
  * Heuristic, explainable scoring. Every dimension it checks is returned with the
  * evidence that produced it, so a `score >= 70` can be audited by a human or an
@@ -16,6 +16,8 @@ export interface SourceInput {
   text: string;
   /** Raw response headers subset worth scoring on */
   headers?: Record<string, string>;
+  /** Publication date declared by the page itself (meta tag / <time datetime>), if any */
+  metaPublished?: string;
   /** HTTP status of the fetch */
   status: number;
   /** Alternate fetch timestamp; defaults to now */
@@ -54,7 +56,7 @@ const PRIMARY_HOSTS = [
   "sec.gov",
   "federalregister.gov",
   "data.gov",
-  " CourtListener".trim(),
+  "courtlistener.com",
 ];
 
 /** Vendor/press domains that count as primary-source about their own claims. */
@@ -88,12 +90,12 @@ const COI_PATTERNS: Array<[RegExp, string]> = [
   [/\bnow available for purchase\b/i, "conflict-of-interest:marketing"],
 ];
 
-const DATE_PATTERNS: Array<[RegExp, string]> = [
-  // meta tags are checked separately
-  [/\b(?:published|posted|updated|revised|released)\s+(?:on\s+)?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{1,2},?\s+\d{4})/i, "$1"],
-  [/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{1,2},?\s+\d{4})/, "$1"],
-  [/(\d{4}-\d{2}-\d{2})/, "$1"],
-  [/(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})/i, "$1"],
+const DATE_PATTERNS: RegExp[] = [
+  // meta tags are checked separately (SourceInput.metaPublished)
+  /\b(?:published|posted|updated|revised|released)\s+(?:on\s+)?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{1,2},?\s+\d{4})/i,
+  /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{1,2},?\s+\d{4})/,
+  /(\d{4}-\d{2}-\d{2})/,
+  /(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})/i,
 ];
 
 /* ------------------------------------------------------------------ */
@@ -108,10 +110,11 @@ function hostnameOf(url: string): string {
   }
 }
 
-function isPrimaryHost(host: string): boolean {
-  return (
-    PRIMARY_HOSTS.some((p) => p && host.endsWith(p.startsWith(".") ? p.slice(1) : p) && (p.startsWith(".") || host === p || host.endsWith("." + p))) ||
-    PRIMARY_HOSTS.includes(host)
+export function isPrimaryHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return PRIMARY_HOSTS.some((p) =>
+    // ".gov" style entries are suffixes; "arxiv.org" style entries match the domain or its subdomains
+    p.startsWith(".") ? h.endsWith(p) : h === p || h.endsWith("." + p)
   );
 }
 
@@ -119,24 +122,26 @@ function includesSubstring(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
+function toIsoDate(value: string | undefined): string | null {
+  if (!value) return null;
+  const t = Date.parse(value.replace(/\.(?=\s)/g, ""));
+  return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * Publication date, in order of trust: the page's own meta declaration, a
+ * Last-Modified header, then the first date-looking string in title/body.
+ * The HTTP `Date` header is deliberately ignored: it is the time the response
+ * was generated, so it would make every page look published today.
+ */
 export function detectPublishedAt(input: SourceInput): string | null {
-  const h = input.headers ?? {};
-  const metaCandidates = [
-    h["last-modified"],
-    h["date"],
-  ];
-  for (const m of metaCandidates) {
-    const t = Date.parse(m);
-    if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
-  }
+  const declared = toIsoDate(input.metaPublished) ?? toIsoDate(input.headers?.["last-modified"]);
+  if (declared) return declared;
   const haystack = `${input.title ?? ""}\n${input.text.slice(0, 4000)}`;
-  for (const [pattern, replacement] of DATE_PATTERNS) {
+  for (const pattern of DATE_PATTERNS) {
     const m = haystack.match(pattern);
-    if (m && m[1]) {
-      const t = Date.parse(m[1].replace(/\./g, ""));
-      if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
-      void replacement;
-    }
+    const iso = toIsoDate(m?.[1]);
+    if (iso) return iso;
   }
   return null;
 }
@@ -149,7 +154,6 @@ export function scoreSource(input: SourceInput): SourceScore {
   const flags: string[] = [];
   const text = input.text ?? "";
   const host = hostnameOf(input.url);
-  const softEvidence = `${host}\n${input.title ?? ""}\n${text.slice(0, 12000)}`;
 
   /* --- 0. gate: dead/inaccessible pages score 0 -------------------- */
   if (input.status !== 200) {
@@ -179,11 +183,9 @@ export function scoreSource(input: SourceInput): SourceScore {
 
   /* --- 1. availability & substance (20) ---------------------------- */
   const textLen = text.length;
-  if (textLen >= 3000) points += 14;
-  else if (textLen >= 800) points += 10;
-  else if (textLen >= 300) points += 6;
-  else points += 2;
-  points += 2; // reachable 200 by construction here
+  // +2 because the page is reachable (status 200 by construction here)
+  const substancePoints = 2 + (textLen >= 3000 ? 14 : textLen >= 800 ? 10 : textLen >= 300 ? 6 : 2);
+  points += substancePoints;
   if (textLen < 300) flags.push("thin-content");
 
   const sourcePrimary = isPrimaryHost(host);
@@ -196,15 +198,18 @@ export function scoreSource(input: SourceInput): SourceScore {
   }
 
   /* --- 2. primary-source status (32) ------------------------------- */
+  let primaryPoints = 0;
+  let outboundCitations = 0;
   if (primaryRelevant) {
-    points += 26; // host signals it
+    primaryPoints = 26; // host signals it
   } else {
     // secondary corroboration still valuable: multi-source attribution
-    const cited = (text.match(/https?:\/\/[^\s")\]]{20,}/g) ?? []).length;
-    if (cited >= 5) points += 14;
-    else if (cited >= 2) points += 8;
-    else if (cited >= 1) points += 4;
+    outboundCitations = (text.match(/https?:\/\/[^\s")\]]{20,}/g) ?? []).length;
+    if (outboundCitations >= 5) primaryPoints = 14;
+    else if (outboundCitations >= 2) primaryPoints = 8;
+    else if (outboundCitations >= 1) primaryPoints = 4;
   }
+  points += primaryPoints;
 
   /* --- 3. freshness (24) ------------------------------------------- */
   const publishedAt = detectPublishedAt(input);
@@ -223,7 +228,6 @@ export function scoreSource(input: SourceInput): SourceScore {
     }
   } else {
     flags.push("no-date");
-    freshnessPoints = 0;
   }
   points += freshnessPoints;
 
@@ -264,21 +268,21 @@ export function scoreSource(input: SourceInput): SourceScore {
   const breakdown: ScoreBreakdown[] = [
     {
       dimension: "availability & substance",
-      points: Math.min(20, textLen >= 3000 ? 16 : textLen >= 800 ? 12 : textLen >= 300 ? 8 : 4),
+      points: substancePoints,
       max: 20,
       verdict: "unknown",
       notes: `${textLen} chars extractable text`,
     },
     {
       dimension: "primary-source",
-      points: primaryRelevant ? 26 : 0,
+      points: primaryPoints,
       max: 32,
-      verdict: primaryRelevant ? (sourcePrimary ? "primary" : "primary") : "secondary",
+      verdict: primaryRelevant ? "primary" : "secondary",
       notes: sourcePrimary
         ? `primary host: ${host}`
         : primaryRelevant
           ? "self-published primary (announcement/press path or docs host)"
-          : "corroborating secondary; outbound citation count used as proxy",
+          : `corroborating secondary; ${outboundCitations} outbound citation(s) used as proxy`,
     },
     {
       dimension: "freshness",
