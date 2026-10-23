@@ -1,0 +1,13 @@
+# Smithery deployment config — https://smithery.ai/docs/build/project-config
+# Builds the root Dockerfile and runs the server over Streamable HTTP; Smithery
+# injects PORT and the server listens on it (any path, including /mcp).
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties: {}
+  exampleConfig: {}

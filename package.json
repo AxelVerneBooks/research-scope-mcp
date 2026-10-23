@@ -1,12 +1,33 @@
 {
   "name": "research-scope-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
+  "mcpName": "io.github.AxelVerneBooks/research-scope-mcp",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/AxelVerneBooks/research-scope-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AxelVerneBooks/research-scope-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AxelVerneBooks/research-scope-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "research",
+    "citations",
+    "source-scoring"
+  ],
+  "bin": {
+    "research-scope-mcp": "dist/index.js"
+  },
   "files": [
     "dist",
     "README.md",
+    "LICENSE",
     "server.json"
   ],
   "engines": {
@@ -17,7 +38,8 @@
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http --port 3001",
     "test": "npm run build && node --test test/server.test.mjs",
-    "demo:capture": "npm run build && node tools/demo-capture.mjs"
+    "demo:capture": "npm run build && node tools/demo-capture.mjs",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

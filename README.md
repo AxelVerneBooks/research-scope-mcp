@@ -22,20 +22,20 @@ mechanically enforced, so the report is auditable by a human in 90 seconds.
 
 ## Install
 
-```bash
-npm install -g research-scope-mcp   # once published; local: npm ci && npm run build
-```
-
-Run over stdio (most clients):
+One command, no clone (Node.js ≥ 20):
 
 ```bash
-npx research-scope-mcp
+npx -y research-scope-mcp
 ```
+
+That runs the server over stdio (most clients). A global install works too:
+`npm install -g research-scope-mcp && research-scope-mcp`. From source:
+`npm ci && npm run build && node dist/index.js`.
 
 Or over Streamable HTTP (remote deployments):
 
 ```bash
-npx research-scope-mcp --http --port 3001
+npx -y research-scope-mcp --http --port 3001
 # unauthenticated requests get 401 + WWW-Authenticate discovery, never a bare 403
 ```
 
@@ -48,9 +48,15 @@ Drop-in config snippets for [Claude Code](clients/claude-code.json),
 ## Docker
 
 ```bash
-docker build -t research-scope-mcp -f docker/Dockerfile .
-docker run --rm -i -p 3001:3001 research-scope-mcp --http --port 3001
+docker build -t research-scope-mcp .
+docker run --rm -p 3001:3001 research-scope-mcp          # Streamable HTTP on $PORT (default 3001)
+docker run --rm -i research-scope-mcp --stdio            # stdio
 ```
+
+Reports are written to `/app/data` (a volume) inside the container.
+
+Also listed via [`server.json`](server.json) (official MCP Registry) and
+[`smithery.yaml`](smithery.yaml) (Smithery, built from the root `Dockerfile`).
 
 ## Tools
 
@@ -92,6 +98,60 @@ one real fetch; repo `data/` is never touched.
 `score ≥ 80` → A, `≥ 65` → B, `≥ 45` → C, else D. The rubric is inside
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
+
+## Publishing
+
+Maintainer-only. Nothing in this repo publishes automatically. Every release needs
+a **new** version (registry and npm versions are immutable), bumped together in
+`package.json`, `src/version.ts`, and `server.json` (both the top-level `version`
+and `packages[0].version`), with a `CHANGELOG.md` entry. Full runbook:
+[PUBLISH.md](PUBLISH.md) and
+[docs/publication/release-checklist-version-bump.md](docs/publication/release-checklist-version-bump.md).
+
+**1. Verify locally**
+
+```bash
+npm ci
+npm test                       # build + integration test (needs network)
+npm pack --dry-run             # expect dist/, README.md, LICENSE, server.json, package.json
+npx -y ./$(npm pack --silent)  # the packed tarball must start over stdio; Ctrl-C to quit
+docker build -t research-scope-mcp .
+```
+
+**2. npm** (must come first: the registry checks that the npm package exists and
+that its `mcpName` matches `server.json`'s `name`)
+
+```bash
+npm login                      # or: bash tools/npm-publish-from-token.sh /path/to/token-file
+npm publish --access public    # prepublishOnly runs the build
+npm view research-scope-mcp version bin mcpName
+```
+
+**3. Official MCP Registry**
+
+```bash
+# install the publisher CLI once (macOS/Linux)
+curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+./mcp-publisher validate
+./mcp-publisher login github   # must be the AxelVerneBooks account (namespace is case-sensitive)
+./mcp-publisher publish
+curl "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.AxelVerneBooks/research-scope-mcp"
+```
+
+**4. Smithery**
+
+Push the release commit to `main` on GitHub, then at
+<https://smithery.ai/new> connect the `AxelVerneBooks/research-scope-mcp` repo (or,
+if already connected, open the server's **Deployments** tab and click **Deploy**).
+Smithery reads [`smithery.yaml`](smithery.yaml), builds the root `Dockerfile`, and
+serves it over Streamable HTTP.
+
+**5. Tag the release**
+
+```bash
+git tag v$(node -p "require('./package.json').version")
+git push origin --tags
+```
 
 ## License
 

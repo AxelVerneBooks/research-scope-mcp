@@ -39,7 +39,7 @@ npm ci && npm run build
 **Streamable HTTP (remote / dockerized):**
 
 ```bash
-docker build -t research-scope-mcp -f docker/Dockerfile .
+docker build -t research-scope-mcp .
 docker run -d --name research-scope -p 3001:3001 research-scope-mcp
 ```
 
