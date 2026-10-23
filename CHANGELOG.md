@@ -4,6 +4,30 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [0.1.3] — 2026-10-23
+
+### Fixed
+- **`npx research-scope-mcp` now actually starts the server.** 0.1.2 shipped with
+  no `bin` entry and no shebang, so npx/global installs had no executable.
+  `package.json` now declares `bin`, and `dist/index.js` starts with
+  `#!/usr/bin/env node`.
+
+### Added
+- `server.json`: `packages[]` npm entry (stdio, `npx`) so the official MCP Registry
+  lists a one-command install; `package.json` gains the matching `mcpName`.
+- `smithery.yaml` (container runtime, Streamable HTTP) for Smithery deployments.
+- README "Publishing" section with the exact maintainer commands.
+
+### Changed
+- Dockerfile moved from `docker/Dockerfile` to the repo root (Smithery/Glama
+  default), with a `.dockerignore`. The HTTP server now listens on `$PORT`
+  (default 3001) instead of a hard-coded `--port 3001`, runs as the `node` user,
+  carries the `io.modelcontextprotocol.server.name` label, and accepts `--stdio`.
+
+### Pending
+- npm 0.1.3, MCP Registry 0.1.3 and Smithery deploys will be published by the
+  maintainer per README "Publishing"; none of them have been published yet.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed

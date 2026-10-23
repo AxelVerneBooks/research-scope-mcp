@@ -18,7 +18,7 @@ issues.
 
 - `fetch_and_score` performs outbound HTTP GETs to caller-supplied URLs. In
   zero-trust environments, run the server inside a network-restricted container
-  (the provided [docker/Dockerfile](docker/Dockerfile) exposes only the MCP port).
+  (the provided [Dockerfile](Dockerfile) exposes only the MCP port).
 - The HTTP transport currently serves a single session without auth. Do **not**
   expose it publicly without an auth proxy in front; supply-chain-wise, the
   registry `remotes[]` entry must point at a host you control (see `server.json`).

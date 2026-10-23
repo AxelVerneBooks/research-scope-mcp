@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+data
+docs
+test
+tools
+clients
+*.md
+!README.md

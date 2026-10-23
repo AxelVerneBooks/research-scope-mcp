@@ -37,6 +37,9 @@ built 2026-10-15 to run with zero improvisation after the AxelVerneBooks login.
    `remotes[]` block was also removed rather than publish a fake URL. Registry
    publication landed same day: `io.github.AxelVerneBooks/research-scope-mcp` v0.1.0,
    status `active`.
+   **UPDATE 0.1.3:** npm is live, so `packages[]` (npm, stdio) is back in
+   `server.json` and `package.json` carries the matching `mcpName`. Publish npm
+   *before* `mcp-publisher publish` — see README "Publishing".
 5. **Publish:** `cd repo && ~/bin/mcp-publisher publish`
 
 ## Immutable-version discipline
