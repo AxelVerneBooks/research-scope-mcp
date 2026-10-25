@@ -2,6 +2,43 @@
 
 **Turn a scattered source set into a decision-ready, traceable report.**
 
+By [Axel Verne](https://axelverne.com), author of the MCP book series.
+
+## Quickstart
+
+1. **Build it** (Node ≥ 20):
+   ```bash
+   git clone https://github.com/AxelVerneBooks/research-scope-mcp
+   cd research-scope-mcp && npm ci && npm run build
+   ```
+2. **Add it to your client.** For Claude Code:
+   ```bash
+   claude mcp add --transport stdio research-scope -- node "$PWD/dist/index.js"
+   ```
+   For Claude Desktop and Cursor JSON configs, see
+   [examples/README.md → Use it from your client](examples/README.md#use-it-from-your-client).
+3. **Check it works.** `node examples/01-verify-install.mjs`, or ask your agent:
+   *"Call plan_research with scope 'verify install' and show me the kill criteria."*
+4. **Run a real research task.** Follow the end-to-end examples. Each one has the script,
+   the prompt to give your agent, and the real output from an actual run:
+
+   | Example | Shows | Real output |
+   |---|---|---|
+   | [01 verify install](examples/01-verify-install.mjs) | tool list + smoke test | [output](examples/output/01-verify-install.txt) |
+   | [02 score sources](examples/02-score-sources.mjs) | scoring 5 URLs, triage, evidence | [output](examples/output/02-score-sources.txt) |
+   | [03 end-to-end report](examples/03-end-to-end-report.mjs) | plan → score → build → cite → **PASS** | [output](examples/output/03-end-to-end-report.txt) |
+   | [04 orphan claims fail](examples/04-orphan-claims-fail.mjs) | what the guardrails refuse, and the fix | [output](examples/output/04-orphan-claims-fail.txt) |
+   | [05 HTTP transport](examples/05-http-transport.mjs) | Streamable HTTP for Docker/remote | [output](examples/output/05-http-transport.txt) |
+
+   `npm run examples` re-runs all five and refreshes the outputs. Changes are in the
+   [CHANGELOG](CHANGELOG.md).
+
+> `npx -y research-scope-mcp` needs the `bin` fix in the next npm release. The published
+> 0.1.2 can't be launched with `npx` (see [CHANGELOG](CHANGELOG.md)). Use the local build above
+> until then.
+
+## What it does
+
 `research-scope-mcp` is an MCP server that runs a research-to-report workflow any
 MCP client can drive end to end:
 
@@ -63,7 +100,8 @@ docker run --rm -i -p 3001:3001 research-scope-mcp --http --port 3001
 
 ## Example walkthrough
 
-See [docs/runs/](docs/runs/) for two worked runs with inputs and outputs, and
+For runnable scripts with real captured output, see [examples/](examples/). See
+[docs/runs/](docs/runs/) for two anonymized narrative walkthroughs, and
 [docs/notes/](docs/notes/) for what to do when something times out or 401s.
 
 ## Demo capture

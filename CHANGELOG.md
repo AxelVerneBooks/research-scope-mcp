@@ -4,6 +4,32 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Fixed
+- **`npx -y research-scope-mcp` could not start the server.** The published 0.1.2
+  `package.json` had no `bin` entry, so `npx` failed with
+  `npm error could not determine executable to run`. That is the command every
+  client config uses ([clients/](clients/), README). Added
+  `"bin": { "research-scope-mcp": "dist/index.js" }` and a `#!/usr/bin/env node`
+  shebang to `src/index.ts`. Verified by running `npx` against an `npm pack`
+  tarball, which answered `initialize`. **Needs a new npm publish to reach users.**
+
+### Added
+- `examples/`: five runnable end-to-end scripts (verify install, score sources,
+  full report to PASS, orphan-claim guardrails, Streamable HTTP), each with its
+  real, unedited captured output in `examples/output/`, plus Claude Desktop /
+  Claude Code / Cursor setup in `examples/README.md`. `npm run examples` re-runs
+  them and refreshes the outputs.
+- README **Quickstart** section linking to the examples.
+
+### Known issues (surfaced by the example runs; not yet fixed)
+- Freshness: `detectPublishedAt` prefers the HTTP `Date` response header over page
+  text, so most live pages read as published today and get full freshness points.
+- Primary detection misses self-published release posts under `/blog/release/`.
+- `check_report` on an empty shell says "orphan claims above" when there are none.
+- `--http` listens on `0.0.0.0`, not loopback.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed

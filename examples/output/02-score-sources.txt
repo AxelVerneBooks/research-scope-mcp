@@ -1,0 +1,74 @@
+# examples/02-score-sources.mjs — captured 2026-10-25T18:06:43.992Z
+# node v22.22.0, research-scope-mcp 0.1.2 (this checkout), exit code 0
+# real output, unedited; regenerate with: node examples/run-all.mjs --only 02
+$ node dist/index.js
+connected: research-scope-mcp 0.1.2 (stdio)
+
+=== fetch_and_score https://nodejs.org/en/blog/release/v22.11.0 ===
+ 78/100 (B)  https://nodejs.org/en/blog/release/v22.11.0  [no flags]
+primary=false publishedAt=2026-10-25 freshnessDays=0
+
+=== fetch_and_score https://pypi.org/project/mcp/ ===
+ 68/100 (B)  https://pypi.org/project/mcp/  [no flags]
+primary=false publishedAt=2026-10-25 freshnessDays=0
+
+=== fetch_and_score https://code.claude.com/docs/en/mcp ===
+ 78/100 (B)  https://code.claude.com/docs/en/mcp  [no flags]
+primary=false publishedAt=2026-10-25 freshnessDays=0
+
+=== fetch_and_score https://registry.modelcontextprotocol.io/v0/servers?search=research-scope-mcp ===
+ 68/100 (B)  https://registry.modelcontextprotocol.io/v0/servers?search=research-scope-mcp  [no flags]
+primary=false publishedAt=2026-10-25 freshnessDays=0
+
+=== fetch_and_score https://nodejs.org/en/blog/release/v0.0.0-this-release-does-not-exist ===
+  0/100 (D)  https://nodejs.org/en/blog/release/v0.0.0-this-release-does-not-exist  [http-404, dead-link]
+primary=false publishedAt=— freshnessDays=—
+
+=== triage (kill criterion: every scored source below 45/100 → stop) ===
+usable:
+   78/100 (B)  https://nodejs.org/en/blog/release/v22.11.0  [no flags]
+   78/100 (B)  https://code.claude.com/docs/en/mcp  [no flags]
+   68/100 (B)  https://pypi.org/project/mcp/  [no flags]
+   68/100 (B)  https://registry.modelcontextprotocol.io/v0/servers?search=research-scope-mcp  [no flags]
+dropped:
+    0/100 (D)  https://nodejs.org/en/blog/release/v0.0.0-this-release-does-not-exist  [http-404, dead-link]
+→ proceed with 4 source(s)
+
+=== full evidence for the lowest-scoring usable source: https://registry.modelcontextprotocol.io/v0/servers?search=research-scope-mcp ===
+[
+  {
+    "dimension": "availability & substance",
+    "points": 12,
+    "max": 20,
+    "verdict": "unknown",
+    "notes": "1363 chars extractable text"
+  },
+  {
+    "dimension": "primary-source",
+    "points": 0,
+    "max": 32,
+    "verdict": "secondary",
+    "notes": "corroborating secondary; outbound citation count used as proxy"
+  },
+  {
+    "dimension": "freshness",
+    "points": 24,
+    "max": 24,
+    "verdict": "unknown",
+    "notes": "published 2026-10-25 (0d ago)"
+  },
+  {
+    "dimension": "access",
+    "points": 12,
+    "max": 12,
+    "verdict": "unknown",
+    "notes": "open access"
+  },
+  {
+    "dimension": "independence",
+    "points": 12,
+    "max": 12,
+    "verdict": "unknown",
+    "notes": "no COI markers detected"
+  }
+]

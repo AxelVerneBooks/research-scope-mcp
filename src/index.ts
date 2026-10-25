@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * research-scope-mcp — MCP server (v0.1.0)
  *
