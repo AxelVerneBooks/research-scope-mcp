@@ -1,0 +1,25 @@
+# examples/05-http-transport.mjs — captured 2026-10-25T18:06:47.111Z
+# node v22.22.0, research-scope-mcp 0.1.2 (this checkout), exit code 0
+# real output, unedited; regenerate with: node examples/run-all.mjs --only 05
+$ node dist/index.js --http --port <free port>
+research-scope-mcp 0.1.2 listening (Streamable HTTP) on http://0.0.0.0:<port>/mcp
+
+=== client A: connect over Streamable HTTP + tools/list ===
+connected: research-scope-mcp 0.1.2 (streamable http)
+- plan_research
+- fetch_and_score
+- build_report
+- check_report
+
+=== client B: separate connection, tools/call plan_research ===
+{
+  "scope": "verify install over http",
+  "killCriteria": [
+    "Fewer than 1 primary + 2 independent secondaries found after checking all target hosts -> stop, report 'insufficient sources' rather than proceeding on thin evidence",
+    "Every scored source below 45/100 -> stop",
+    "Primary source is paywalled AND no archived copy is retrievable -> mark claim unverifiable"
+  ]
+}
+
+=== result ===
+OK — two independent HTTP clients served

@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
   "type": "module",
+  "bin": {
+    "research-scope-mcp": "dist/index.js"
+  },
   "license": "MIT",
   "files": [
     "dist",
@@ -17,7 +20,8 @@
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http --port 3001",
     "test": "npm run build && node --test test/server.test.mjs",
-    "demo:capture": "npm run build && node tools/demo-capture.mjs"
+    "demo:capture": "npm run build && node tools/demo-capture.mjs",
+    "examples": "npm run build && node examples/run-all.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",

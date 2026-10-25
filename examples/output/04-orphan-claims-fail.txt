@@ -1,0 +1,54 @@
+# examples/04-orphan-claims-fail.mjs — captured 2026-10-25T18:06:46.475Z
+# node v22.22.0, research-scope-mcp 0.1.2 (this checkout), exit code 0
+# real output, unedited; regenerate with: node examples/run-all.mjs --only 04
+$ node dist/index.js
+connected: research-scope-mcp 0.1.2 (stdio)
+
+=== setup: fetch_and_score https://nodejs.org/en/blog/release/v22.11.0 ===
+ 78/100 (B)  https://nodejs.org/en/blog/release/v22.11.0  [no flags]
+
+=== a) build_report with an unscored source ===
+isError: true
+These URLs were never scored — run fetch_and_score on them first:
+https://example.com/blog/node-22-is-lts
+
+=== b) build_report with only the scored source, then check the empty shell ===
+{
+  "report": "/tmp/rsm-example-aSDCWC/reports/report-4286d684.md",
+  "pass": false,
+  "claimsFound": 0,
+  "claimsCited": 0,
+  "orphanClaims": "none",
+  "verdict": "FAIL — orphan claims above cite no scored source; fill or remove them"
+}
+
+=== c) one cited claim + one claim with no citation ===
+- Node.js 22.11.0 moved the 22.x release line into Long Term Support under the codename 'Jod' [S1].
+- Node.js 22 is also the fastest Node.js release line ever shipped for MCP workloads.
+{
+  "report": "/tmp/rsm-example-aSDCWC/reports/report-4286d684.md",
+  "pass": false,
+  "claimsFound": 2,
+  "claimsCited": 1,
+  "orphanClaims": [
+    {
+      "claim": "Node.js 22 is also the fastest Node.js release line ever shipped for MCP workloads.",
+      "claimId": "C8",
+      "sourceUrls": []
+    }
+  ],
+  "verdict": "FAIL — orphan claims above cite no scored source; fill or remove them"
+}
+
+=== d) fix: the orphan claim has no source, so remove it (citing it to [S1] would be a lie) and re-check ===
+{
+  "report": "/tmp/rsm-example-aSDCWC/reports/report-4286d684.md",
+  "pass": true,
+  "claimsFound": 1,
+  "claimsCited": 1,
+  "orphanClaims": "none",
+  "verdict": "PASS — every claim cites a scored source"
+}
+
+=== result ===
+OK — unscored source refused, orphan claim caught, clean report passes

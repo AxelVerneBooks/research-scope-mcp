@@ -1,0 +1,52 @@
+# examples/01-verify-install.mjs — captured 2026-10-25T18:06:35.817Z
+# node v22.22.0, research-scope-mcp 0.1.2 (this checkout), exit code 0
+# real output, unedited; regenerate with: node examples/run-all.mjs --only 01
+$ node dist/index.js
+connected: research-scope-mcp 0.1.2 (stdio)
+
+=== tools/list — what the client shows in its tool picker ===
+- plan_research(scope, domain_hints?) — Plan research scope
+- fetch_and_score(source_url) — Fetch and score a source
+- build_report(topic, sources) — Build citation-registry report shell
+- check_report(report_id?, report_path?) — Check report citation coverage
+
+=== server instructions — sent to the model at initialize ===
+Research-to-report workflow. Use plan_research first, then fetch_and_score each candidate source, then build_report, then check_report before presenting findings.
+
+=== tools/call plan_research { scope: "verify install" } ===
+{
+  "scope": "verify install",
+  "generatedAt": "2026-10-25T18:06:35.794Z",
+  "primarySourceTargets": [
+    {
+      "what": "The original claim-maker's own statement (press release, changelog, official filing)",
+      "why": "anchors what is actually claimed, before anyone's summary of it"
+    },
+    {
+      "what": "Any regulator / standards body page covering the domain (.gov)",
+      "why": "highest-weight primary host in the scorer"
+    }
+  ],
+  "corroboratingTargets": [
+    {
+      "what": "Two independent secondary reports citing different primaries",
+      "why": "cross-check that the primary claim wasn't retracted or misread"
+    },
+    {
+      "what": "A dated community thread (forum, mailing list archive) for on-the-ground reaction",
+      "why": "flags practical impact the official pages omit"
+    }
+  ],
+  "antiTargets": [
+    "sponsored posts, affiliate round-ups, pages with 'in partnership with'",
+    "undated aggregator rewrites"
+  ],
+  "killCriteria": [
+    "Fewer than 1 primary + 2 independent secondaries found after checking all target hosts -> stop, report 'insufficient sources' rather than proceeding on thin evidence",
+    "Every scored source below 45/100 -> stop",
+    "Primary source is paywalled AND no archived copy is retrievable -> mark claim unverifiable"
+  ]
+}
+
+=== result ===
+OK — 4 tools exposed, plan_research returned a complete plan
