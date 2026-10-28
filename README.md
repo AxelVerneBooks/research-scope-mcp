@@ -2,6 +2,8 @@
 
 **Turn a scattered source set into a decision-ready, traceable report.**
 
+By [Axel Verne](https://axelverne.com), author of the MCP book series.
+
 `research-scope-mcp` is an MCP server that runs a research-to-report workflow any
 MCP client can drive end to end:
 
@@ -36,8 +38,29 @@ Or over Streamable HTTP (remote deployments):
 
 ```bash
 npx research-scope-mcp --http --port 3001
-# unauthenticated requests get 401 + WWW-Authenticate discovery, never a bare 403
+# no auth layer: keep it on loopback or behind an auth proxy (see SECURITY.md)
 ```
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RESEARCH_SCOPE_DATA_DIR` | `./data` (server's working dir) | Where `build_report` saves `reports/`. Set an absolute, writable path in client configs. |
+| `RESEARCH_SCOPE_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent`. |
+| `PORT` | `3001` | HTTP port when `--port` is not given. |
+| `NODE_USE_ENV_PROXY` | unset | Set to `1` behind an HTTP(S) proxy; Node's `fetch` ignores `HTTPS_PROXY` otherwise. |
+
+## Logging
+
+Logs are structured JSON, one object per line, on **stderr** only (stdout is the
+stdio protocol channel):
+
+```json
+{"ts":"2026-10-28T06:04:17.264Z","level":"warn","event":"fetch.failed","url":"https://example.invalid/","code":"ENOTFOUND","durationMs":25}
+```
+
+Tool errors say what went wrong and what to do, and link to the matching section of
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Client config
 
@@ -64,7 +87,7 @@ docker run --rm -i -p 3001:3001 research-scope-mcp --http --port 3001
 ## Example walkthrough
 
 See [docs/runs/](docs/runs/) for two worked runs with inputs and outputs, and
-[docs/notes/](docs/notes/) for what to do when something times out or 401s.
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) for what to do when something fails.
 
 ## Demo capture
 
@@ -92,6 +115,12 @@ one real fetch; repo `data/` is never touched.
 `score ≥ 80` → A, `≥ 65` → B, `≥ 45` → C, else D. The rubric is inside
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
+
+## Troubleshooting and bugs
+
+Start with [TROUBLESHOOTING.md](TROUBLESHOOTING.md). If it does not cover your
+problem, open a [bug report](https://github.com/AxelVerneBooks/research-scope-mcp/issues/new?template=bug_report.yml)
+with your debug logs.
 
 ## License
 

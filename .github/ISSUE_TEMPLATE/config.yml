@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting guide
+    url: https://github.com/AxelVerneBooks/research-scope-mcp/blob/main/TROUBLESHOOTING.md
+    about: Fixes for network, timeout, data-dir and citation-check problems.
+  - name: Report a security vulnerability
+    url: https://github.com/AxelVerneBooks/research-scope-mcp/security/advisories/new
+    about: Report privately, never in a public issue. See SECURITY.md.

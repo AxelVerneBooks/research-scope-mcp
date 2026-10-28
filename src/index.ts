@@ -1,5 +1,5 @@
 /**
- * research-scope-mcp — MCP server (v0.1.0)
+ * research-scope-mcp — MCP server
  *
  * Research-to-report workflow: plan sources with kill criteria, fetch-and-score
  * them, assemble a citation-registry report shell, then verify every claim has a
@@ -8,8 +8,10 @@
  * Transports:
  *   - stdio (default):  `node dist/index.js`
  *   - Streamable HTTP:  `node dist/index.js --http --port 3001`
- *     Unauthenticated clients get a 401 with WWW-Authenticate pointing at the
- *     discovery document (correct MCP OAuth discovery behavior — never a 403).
+ *     No auth layer: keep it on loopback or behind an auth proxy (SECURITY.md).
+ *
+ * Logging: structured JSON lines on stderr only (see log.ts); stdout belongs to
+ * the stdio protocol.
  *
  * Tools:
  *   plan_research(scope)            -> source-target plan with kill criteria
@@ -30,8 +32,11 @@ import { z } from "zod";
 
 import { scoreSource, type SourceScore } from "./scoring/score.js";
 import { version } from "./version.js";
+import { log } from "./log.js";
 
 const DATA_DIR = pathResolve(process.env.RESEARCH_SCOPE_DATA_DIR ?? pathResolve(process.cwd(), "data"));
+const FETCH_TIMEOUT_MS = 15000;
+const TROUBLESHOOTING_URL = "https://github.com/AxelVerneBooks/research-scope-mcp/blob/main/TROUBLESHOOTING.md";
 
 /* ------------------------------------------------------------------ */
 /* report model                                                        */
@@ -79,7 +84,97 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-async function fetchSource(url: string, timeoutMs = 15000): Promise<{ status: number; title: string; text: string; headers: Record<string, string>; finalUrl: string }> {
+/** Link to a TROUBLESHOOTING.md section, appended to every actionable error. */
+function seeDocs(anchor: string): string {
+  return `See ${TROUBLESHOOTING_URL}#${anchor}`;
+}
+
+function toolError(text: string) {
+  return { isError: true, content: [{ type: "text" as const, text }] };
+}
+
+function errorCode(err: unknown): string | undefined {
+  const e = err as { code?: unknown; cause?: { code?: unknown } } | null;
+  const code = e?.cause?.code ?? e?.code;
+  return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * Turn a fetch() rejection into a message that says what failed and what to do.
+ * Node's fetch rejects with a bare "fetch failed"; the useful part is in `cause`.
+ */
+function describeFetchError(url: string, err: unknown): string {
+  const host = (() => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  })();
+  if (err instanceof Error && err.name === "AbortError") {
+    return `Timed out after ${FETCH_TIMEOUT_MS / 1000}s fetching ${url}. The host accepted no complete response in time (large PDF, slow server, or bot wall). Retry once; if it keeps timing out, treat the source as unusable or score an archived copy. ${seeDocs("fetch-times-out")}`;
+  }
+  const code = errorCode(err);
+  const detail = err instanceof Error ? `${err.message}${code ? ` (${code})` : ""}` : String(err);
+  switch (code) {
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return `Could not resolve host "${host}" (${code}). Check the URL for typos; if the server runs in a container or sandbox, confirm it has DNS and outbound network access, and behind an HTTP proxy start Node with NODE_USE_ENV_PROXY=1. ${seeDocs("fetch-fails-with-a-network-error")}`;
+    case "ECONNREFUSED":
+    case "ECONNRESET":
+    case "ETIMEDOUT":
+    case "EHOSTUNREACH":
+    case "ENETUNREACH":
+    case "UND_ERR_CONNECT_TIMEOUT":
+    case "UND_ERR_SOCKET":
+      return `Network error reaching "${host}" (${code}). The host refused or dropped the connection, or outbound traffic is blocked (firewall, proxy, container network policy). ${seeDocs("fetch-fails-with-a-network-error")}`;
+    case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
+    case "UNABLE_TO_GET_ISSUER_CERT_LOCALLY":
+    case "SELF_SIGNED_CERT_IN_CHAIN":
+    case "DEPTH_ZERO_SELF_SIGNED_CERT":
+    case "CERT_HAS_EXPIRED":
+    case "ERR_TLS_CERT_ALTNAME_INVALID":
+      return `TLS certificate check failed for "${host}" (${code}). If a corporate proxy re-signs HTTPS, point NODE_EXTRA_CA_CERTS at its CA bundle; never disable TLS verification. ${seeDocs("fetch-fails-with-a-network-error")}`;
+    default:
+      return `Fetching ${url} failed: ${detail}. ${seeDocs("fetch-fails-with-a-network-error")}`;
+  }
+}
+
+/** Trailing slash, scheme and host case differ often between what was scored and what is cited. */
+function normalizeUrlForMatch(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname.toLowerCase()}${u.pathname.replace(/\/+$/, "")}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/** Run a tool handler with start/finish logging; unexpected throws become actionable tool errors. */
+function logged<A>(tool: string, handler: (args: A) => Promise<ReturnType<typeof toolError> | { content: Array<{ type: "text"; text: string }> }>) {
+  return async (args: A) => {
+    const started = Date.now();
+    log.debug("tool.start", { tool, args });
+    try {
+      const result = await handler(args);
+      const isError = "isError" in result && result.isError === true;
+      (isError ? log.warn : log.info)("tool.finish", {
+        tool,
+        ok: !isError,
+        durationMs: Date.now() - started,
+        ...(isError ? { error: result.content[0]?.text } : {}),
+      });
+      return result;
+    } catch (err) {
+      log.error("tool.crash", { tool, durationMs: Date.now() - started, err });
+      return toolError(
+        `${tool} hit an unexpected internal error: ${(err as Error)?.message ?? String(err)}. This is a bug, not a problem with your input — please file it with the stderr log lines (set RESEARCH_SCOPE_LOG_LEVEL=debug). ${seeDocs("reporting-a-bug")}`
+      );
+    }
+  };
+}
+
+async function fetchSource(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<{ status: number; title: string; text: string; headers: Record<string, string>; finalUrl: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -87,7 +182,7 @@ async function fetchSource(url: string, timeoutMs = 15000): Promise<{ status: nu
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "user-agent": "research-scope-mcp/0.1 (+research-scoring)",
+        "user-agent": `research-scope-mcp/${version} (+research-scoring)`,
         accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
       },
     });
@@ -201,7 +296,7 @@ server.registerTool(
       domain_hints: z.array(z.string()).optional().describe("Suggested source domains, e.g. ['.gov', 'arxiv.org']"),
     },
   },
-  async ({ scope, domain_hints }) => {
+  logged("plan_research", async ({ scope, domain_hints }: { scope: string; domain_hints?: string[] }) => {
     const hints = domain_hints?.length ? domain_hints : [".gov", ".edu", "arxiv.org", "press"];
     const plan = {
       scope,
@@ -227,7 +322,7 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(plan, null, 2) }],
     };
-  }
+  })
 );
 
 /* --- tool 2: fetch_and_score -------------------------------------- */
@@ -242,8 +337,33 @@ server.registerTool(
       source_url: z.string().url().describe("The source URL to fetch and score"),
     },
   },
-  async ({ source_url }) => {
-    const fetched = await fetchSource(source_url);
+  logged("fetch_and_score", async ({ source_url }: { source_url: string }) => {
+    const started = Date.now();
+    let fetched: Awaited<ReturnType<typeof fetchSource>>;
+    try {
+      fetched = await fetchSource(source_url);
+    } catch (err) {
+      log.warn("fetch.failed", { url: source_url, durationMs: Date.now() - started, code: errorCode(err), err });
+      return toolError(describeFetchError(source_url, err));
+    }
+    log.info("fetch.done", {
+      url: source_url,
+      finalUrl: fetched.finalUrl,
+      status: fetched.status,
+      contentType: fetched.headers["content-type"],
+      textChars: fetched.text.length,
+      durationMs: Date.now() - started,
+    });
+    if (fetched.status !== 200) {
+      log.warn("fetch.non_200", {
+        url: source_url,
+        status: fetched.status,
+        hint:
+          fetched.status === 401 || fetched.status === 403 || fetched.status === 429
+            ? "likely a bot wall or rate limit rather than a dead page; the source scores 0/D"
+            : "page not retrievable; the source scores 0/D",
+      });
+    }
     const score = scoreSource({
       url: fetched.finalUrl,
       title: fetched.title,
@@ -253,10 +373,11 @@ server.registerTool(
     });
     scoreRegistry.set(fetched.finalUrl, score);
     scoreRegistry.set(source_url, score); // index under the requested URL too
+    log.debug("score.registered", { url: source_url, finalUrl: fetched.finalUrl, score: score.score, grade: score.grade, flags: score.flags });
     return {
       content: [{ type: "text" as const, text: JSON.stringify(score, null, 2) }],
     };
-  }
+  })
 );
 
 /* --- tool 3: build_report ----------------------------------------- */
@@ -272,7 +393,7 @@ server.registerTool(
       sources: z.array(z.string().url()).min(1).describe("Source URLs previously scored with fetch_and_score"),
     },
   },
-  async ({ topic, sources }) => {
+  logged("build_report", async ({ topic, sources }: { topic: string; sources: string[] }) => {
     const entries: PaperTrailEntry[] = [];
     const missing: string[] = [];
     for (const url of sources) {
@@ -284,18 +405,29 @@ server.registerTool(
       entries.push({ url: s.url, score: s.score, grade: s.grade, publishedAt: s.publishedAt, flags: s.flags, scoredAt: s.scoredAt });
     }
     if (missing.length) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: "text" as const,
-            text: `These URLs were never scored — run fetch_and_score on them first:\n${missing.join("\n")}`,
-          },
-        ],
-      };
+      // Point at near-misses (trailing slash, host case, redirect target) so the
+      // caller can fix the citation instead of re-fetching.
+      const scored = [...scoreRegistry.keys()];
+      const lines = missing.map((url) => {
+        const near = scored.find((k) => normalizeUrlForMatch(k) === normalizeUrlForMatch(url));
+        return near ? `${url}  (did you mean ${near}? URLs must match exactly)` : url;
+      });
+      const empty = scoreRegistry.size === 0
+        ? "\nNo sources are scored in this server process at all. Scores live in memory only: they are lost when the server restarts, and the HTTP transport shares them only within one running process."
+        : "";
+      return toolError(
+        `These URLs were never scored — run fetch_and_score on them first, then pass the exact same URLs to build_report:\n${lines.join("\n")}${empty}\n${seeDocs("build_report-says-a-url-was-never-scored")}`
+      );
     }
-    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-    if (!existsSync(pathResolve(DATA_DIR, "reports"))) mkdirSync(pathResolve(DATA_DIR, "reports"), { recursive: true });
+    const reportsDir = pathResolve(DATA_DIR, "reports");
+    try {
+      mkdirSync(reportsDir, { recursive: true });
+    } catch (err) {
+      log.error("report.mkdir_failed", { dir: reportsDir, code: errorCode(err), err });
+      return toolError(
+        `Cannot create the report directory ${reportsDir} (${errorCode(err) ?? (err as Error).message}). ${process.env.RESEARCH_SCOPE_DATA_DIR ? "RESEARCH_SCOPE_DATA_DIR points there; change it" : "RESEARCH_SCOPE_DATA_DIR is unset, so the data dir is ./data under the directory the client launched the server from, which is often read-only. Set RESEARCH_SCOPE_DATA_DIR"} to a writable absolute path in the client's MCP config. ${seeDocs("report-directory-is-not-writable")}`
+      );
+    }
     const id = randomUUID().slice(0, 8);
     const markdown = renderReportShell(topic, entries);
     const report: StoredReport = {
@@ -307,8 +439,16 @@ server.registerTool(
       markdown,
     };
     reports.set(id, report);
-    const reportPath = pathResolve(DATA_DIR, "reports", `report-${id}.md`);
-    writeFileSync(reportPath, markdown, "utf8");
+    const reportPath = pathResolve(reportsDir, `report-${id}.md`);
+    try {
+      writeFileSync(reportPath, markdown, "utf8");
+    } catch (err) {
+      log.error("report.write_failed", { path: reportPath, code: errorCode(err), err });
+      return toolError(
+        `Cannot write ${reportPath} (${errorCode(err) ?? (err as Error).message}). Set RESEARCH_SCOPE_DATA_DIR to a writable absolute path. ${seeDocs("report-directory-is-not-writable")}`
+      );
+    }
+    log.info("report.built", { id, path: reportPath, sources: entries.length });
     const registryLine = entries.map((e, i) => `[S${i + 1}] ${e.url} (${e.score}/100, ${e.grade})`).join("\n");
     return {
       content: [
@@ -318,7 +458,7 @@ server.registerTool(
         },
       ],
     };
-  }
+  })
 );
 
 /* --- tool 4: check_report ----------------------------------------- */
@@ -334,29 +474,45 @@ server.registerTool(
       report_path: z.string().optional().describe("Path to a report markdown file (overrides report_id)"),
     },
   },
-  async ({ report_id, report_path }) => {
+  logged("check_report", async ({ report_id, report_path }: { report_id?: string; report_path?: string }) => {
     let markdown: string | null = null;
     let label = report_id ?? report_path ?? "";
+    let note: string | undefined;
     if (report_path) {
       const p = pathResolve(report_path);
       if (!existsSync(p)) {
-        return { isError: true, content: [{ type: "text" as const, text: `Report file not found: ${p}` }] };
+        const relative = p !== report_path ? ` Relative paths resolve against the server's working directory (${process.cwd()}), not the client's — pass an absolute path.` : "";
+        return toolError(`Report file not found: ${p}.${relative} ${seeDocs("check_report-cannot-find-the-report")}`);
       }
-      markdown = readFileSync(p, "utf8");
+      try {
+        markdown = readFileSync(p, "utf8");
+      } catch (err) {
+        return toolError(`Cannot read report file ${p} (${errorCode(err) ?? (err as Error).message}). report_path must point at a readable markdown file, not a directory. ${seeDocs("check_report-cannot-find-the-report")}`);
+      }
       label = p;
     } else if (report_id && reports.has(report_id)) {
+      // report_id checks the shell as build_report produced it; edits made to the
+      // saved file are only seen via report_path.
       markdown = reports.get(report_id)!.markdown;
       label = report_id;
+      note = "Checked the in-memory shell for this report_id, not the file on disk. If you edited the saved report, re-run check_report with report_path.";
+    } else if (report_id) {
+      return toolError(
+        `Unknown report_id "${report_id}". Report ids live in memory only, so they are lost when the server restarts; the in-memory copy is also the unedited shell. Pass report_path with the absolute path build_report printed (${pathResolve(DATA_DIR, "reports", `report-${report_id}.md`)}) to check your edited file. ${seeDocs("check_report-cannot-find-the-report")}`
+      );
     } else {
-      return {
-        isError: true,
-        content: [{ type: "text" as const, text: "Provide either report_id (from build_report) or report_path." }],
-      };
+      return toolError("Provide either report_id (from build_report) or report_path (absolute path to the report markdown file).");
     }
 
     const claims = extractClaims(markdown ?? "");
     const orphan = claims.filter((c) => c.sourceUrls.length === 0);
     const ok = orphan.length === 0 && claims.length > 0;
+    const verdict = ok
+      ? "PASS — every claim cites a scored source"
+      : claims.length === 0
+        ? "FAIL — no substantive claims found. Write findings (40+ characters each) under ## Claims, citing [Sn] numbers from the citation registry, then re-run check_report."
+        : "FAIL — orphan claims above cite no scored source; add a [Sn] citation from the registry or remove them";
+    log.info("report.checked", { report: label, pass: ok, claimsFound: claims.length, orphanClaims: orphan.length });
 
     return {
       content: [
@@ -369,16 +525,16 @@ server.registerTool(
               claimsFound: claims.length,
               claimsCited: claims.length - orphan.length,
               orphanClaims: orphan.length ? orphan : "none",
-              verdict: ok ? "PASS — every claim cites a scored source" : "FAIL — orphan claims above cite no scored source; fill or remove them",
+              verdict,
+              ...(note ? { note } : {}),
             },
             null,
             2
           ),
         },
       ],
-      ...(ok ? {} : {}),
     };
-  }
+  })
 );
   return server;
 }
@@ -393,6 +549,7 @@ const server: McpServer = buildServer();
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  log.info("server.start", { version, transport: "stdio", dataDir: DATA_DIR, pid: process.pid });
   // stdio keeps the process alive until the client closes the pipe
 }
 
@@ -403,6 +560,11 @@ function runHttp(port: number): void {
   // SDK's official stateless example: new server + new transport per request,
   // both closed when the response ends. Module-scope registries keep state.
   const httpServer = createHttpServer((req, res) => {
+    const requestId = randomUUID().slice(0, 8);
+    const started = Date.now();
+    res.on("finish", () => {
+      log.debug("http.request", { requestId, method: req.method, path: req.url, status: res.statusCode, durationMs: Date.now() - started });
+    });
     void (async () => {
       try {
         const requestServer = buildServer();
@@ -418,12 +580,17 @@ function runHttp(port: number): void {
         // Note: closing the pair here (after a completed request) would race
         // clients that keep SSE streams open; the "close" listener owns teardown.
       } catch (err) {
-        // never leak as 403; protocol discovery errors surface as 401/discovery doc
+        log.error("http.request_failed", { requestId, method: req.method, path: req.url, err });
         if (!res.headersSent) {
           res.statusCode = 500;
           res.setHeader("content-type", "application/json");
         }
-        const payload = JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: (err as Error).message } });
+        // -32603 = JSON-RPC internal error (this is not a parse error)
+        const payload = JSON.stringify({
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32603, message: `Internal server error: ${(err as Error).message}`, data: { requestId } },
+        });
         if (!res.writableEnded) {
           res.end(payload);
         } else {
@@ -432,26 +599,56 @@ function runHttp(port: number): void {
       }
     })();
   });
+  httpServer.on("error", (err) => {
+    const code = errorCode(err);
+    const hint =
+      code === "EADDRINUSE"
+        ? `port ${port} is already in use — stop the other process or pass --port <free port>`
+        : code === "EACCES"
+          ? `not allowed to bind port ${port} — use a port above 1024 or run with the needed privileges`
+          : "could not start the HTTP listener";
+    log.error("server.listen_failed", { port, code, hint, err });
+    process.exit(1);
+  });
   httpServer.listen(port, () => {
     const addr = httpServer.address();
     const bound = typeof addr === "object" && addr ? `${addr.address}:${addr.port}` : String(port);
-    // stdout carries protocol logs to the log file; stderr to the console
-    console.error(`research-scope-mcp ${version} listening (Streamable HTTP) on http://${bound}/mcp`);
+    log.info("server.start", { version, transport: "http", url: `http://${bound}/mcp`, dataDir: DATA_DIR, pid: process.pid });
   });
 }
 
 /* --- entry -------------------------------------------------------- */
 
+process.on("unhandledRejection", (reason) => {
+  log.error("process.unhandled_rejection", { err: reason });
+});
+process.on("uncaughtException", (err) => {
+  log.error("process.uncaught_exception", { err });
+  process.exit(1);
+});
+
+function parsePort(args: string[]): number {
+  const portIdx = args.indexOf("--port");
+  const raw = portIdx >= 0 ? args[portIdx + 1] : process.env.PORT;
+  if (raw === undefined || raw === "") return 3001;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    log.error("server.invalid_port", {
+      value: raw,
+      source: portIdx >= 0 ? "--port" : "PORT",
+      hint: "port must be an integer between 1 and 65535, e.g. --port 3001",
+    });
+    process.exit(2);
+  }
+  return port;
+}
+
 const args = process.argv.slice(2);
 if (args.includes("--http")) {
-  const portIdx = args.indexOf("--port");
-  const port = portIdx >= 0 ? Number(args[portIdx + 1]) || 3001 : Number(process.env.PORT) || 3001;
-  runHttp(port);
+  runHttp(parsePort(args));
 } else {
   runStdio().catch((err) => {
-    console.error("stdio transport failed:", err);
+    log.error("server.start_failed", { transport: "stdio", err });
     process.exit(1);
   });
 }
-
-// keep version.ts below credits budget — single export

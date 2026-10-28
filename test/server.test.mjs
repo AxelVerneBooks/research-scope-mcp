@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -18,8 +19,18 @@ class StdioMcpClient {
   #child;
   #buf = "";
   #pending = new Map();
+  /** Every stderr line the server wrote (structured JSON logs). */
+  stderrLines = [];
   constructor(child) {
     this.#child = child;
+    let errBuf = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => {
+      errBuf += chunk;
+      const parts = errBuf.split("\n");
+      errBuf = parts.pop();
+      this.stderrLines.push(...parts.filter(Boolean));
+    });
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       this.#buf += chunk;
@@ -41,11 +52,11 @@ class StdioMcpClient {
       }
     });
   }
-  static spawn() {
+  static spawn(env = {}) {
     const child = spawn(process.execPath, [join(process.cwd(), "dist", "index.js")], {
       cwd: process.cwd(),
-      env: { ...process.env, RESEARCH_SCOPE_DATA_DIR: DATA_DIR },
-      stdio: ["pipe", "pipe", "inherit"],
+      env: { ...process.env, RESEARCH_SCOPE_DATA_DIR: DATA_DIR, ...env },
+      stdio: ["pipe", "pipe", "pipe"],
     });
     return new this(child);
   }
@@ -167,7 +178,9 @@ test("full workflow: plan → fetch_and_score → build → check (live fetch, n
     assert.ok(plan.killCriteria.length >= 1);
 
     // 2. fetch_and_score — real (small, stable, primary-host) page; prefix-match union honors both URLs
-    const scored = JSON.parse(textPayload(await client.request("tools/call", { name: "fetch_and_score", arguments: { source_url: "https://www.nhtsa.gov/" } })));
+    const fetchResult = await client.request("tools/call", { name: "fetch_and_score", arguments: { source_url: "https://www.nhtsa.gov/" } });
+    assert.ok(!fetchResult.isError, `live fetch failed (network required — see TROUBLESHOOTING.md): ${textPayload(fetchResult)}`);
+    const scored = JSON.parse(textPayload(fetchResult));
     assert.ok(typeof scored.score === "number" && scored.score > 0, `expected positive score, got ${JSON.stringify(scored)}`);
     assert.ok(Array.isArray(scored.flags));
     assert.ok(scored.breakdown.length >= 4);
@@ -199,4 +212,98 @@ test("full workflow: plan → fetch_and_score → build → check (live fetch, n
     await client.close();
   }
   rmSync(DATA_DIR, { recursive: true, force: true });
+});
+
+/** Initialize a stdio client and return it ready for tools/call. */
+async function initializedClient(env) {
+  const client = StdioMcpClient.spawn(env);
+  await client.request("initialize", {
+    protocolVersion: "2025-06-18",
+    capabilities: {},
+    clientInfo: { name: "test-client", version: "0.0.1" },
+  });
+  client.notify("notifications/initialized", {});
+  return client;
+}
+
+const call = (client, name, args) => client.request("tools/call", { name, arguments: args });
+
+test("logging: stderr carries only structured JSON lines, stdout only JSON-RPC", async () => {
+  const client = await initializedClient({ RESEARCH_SCOPE_LOG_LEVEL: "debug" });
+  try {
+    await call(client, "plan_research", { scope: "logging probe" });
+    // let the finish log flush
+    await new Promise((r) => setTimeout(r, 100));
+    assert.ok(client.stderrLines.length >= 2, `expected log lines, got ${JSON.stringify(client.stderrLines)}`);
+    for (const line of client.stderrLines) {
+      const rec = JSON.parse(line);
+      assert.ok(rec.ts && rec.level && rec.event, `log line missing ts/level/event: ${line}`);
+    }
+    const events = client.stderrLines.map((l) => JSON.parse(l).event);
+    assert.ok(events.includes("server.start"));
+    assert.ok(events.includes("tool.finish"));
+  } finally {
+    await client.close();
+  }
+});
+
+test("fetch_and_score: network failure is an actionable tool error, not a bare 'fetch failed'", async () => {
+  const client = await initializedClient();
+  try {
+    const res = await call(client, "fetch_and_score", { source_url: "https://does-not-exist.invalid/" });
+    assert.equal(res.isError, true);
+    const text = textPayload(res);
+    assert.doesNotMatch(text, /^fetch failed$/);
+    assert.match(text, /does-not-exist\.invalid/);
+    assert.match(text, /TROUBLESHOOTING\.md#/);
+  } finally {
+    await client.close();
+  }
+});
+
+test("offline workflow against a local page: near-miss URL hint, unknown report_id, empty-shell verdict", async () => {
+  const page = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(`<title>Local fixture</title><p>${"Substantive fixture text. ".repeat(60)}</p>`);
+  });
+  page.listen(0, "127.0.0.1");
+  await once(page, "listening");
+  const url = `http://127.0.0.1:${page.address().port}/fixture/`;
+  const dataDir = mkdtempSync(join(tmpdir(), "rsmcp-offline-"));
+  const client = await initializedClient({ RESEARCH_SCOPE_DATA_DIR: dataDir });
+  try {
+    const scored = await call(client, "fetch_and_score", { source_url: url });
+    assert.ok(!scored.isError, textPayload(scored));
+
+    // trailing-slash mismatch → refused, with the scored URL suggested
+    const nearMiss = await call(client, "build_report", { topic: "Offline", sources: [url.slice(0, -1)] });
+    assert.equal(nearMiss.isError, true);
+    assert.match(textPayload(nearMiss), new RegExp(`did you mean ${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+
+    const built = textPayload(await call(client, "build_report", { topic: "Offline", sources: [url] }));
+    const id = built.match(/Report shell (\w+) saved to (\S+\.md)/);
+    assert.ok(id, built);
+
+    const unknown = await call(client, "check_report", { report_id: "nope1234" });
+    assert.equal(unknown.isError, true);
+    assert.match(textPayload(unknown), /Unknown report_id/);
+
+    const empty = JSON.parse(textPayload(await call(client, "check_report", { report_id: id[1] })));
+    assert.equal(empty.pass, false);
+    assert.match(empty.verdict, /no substantive claims/);
+    assert.match(empty.note, /report_path/);
+
+    // an authored, cited claim in the saved file passes via report_path
+    const edited = built.split("\n---\n")[1].replace(
+      "## Claims\n",
+      "## Claims\n\n- The local fixture page repeats its substantive text sixty times over [S1].\n"
+    );
+    writeFileSync(id[2], edited, "utf8");
+    const passed = JSON.parse(textPayload(await call(client, "check_report", { report_path: id[2] })));
+    assert.equal(passed.pass, true, JSON.stringify(passed));
+  } finally {
+    await client.close();
+    page.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
 });
