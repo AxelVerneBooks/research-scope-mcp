@@ -61,5 +61,6 @@ auth proxy.
 Ask the agent to call `plan_research` with scope `"verify install"`. A successful
 response is a JSON object containing `primarySourceTargets`, `corroboratingTargets`,
 and `killCriteria`. If the tool list is empty, check the client's MCP log for
-startup errors and confirm `npx research-scope-mcp` produces no stderr output when
-launched directly.
+startup errors. Launched directly, `npx research-scope-mcp` should print one JSON
+`"event":"server.start"` line to stderr and nothing to stdout; anything else is
+covered in [TROUBLESHOOTING.md](../TROUBLESHOOTING.md).

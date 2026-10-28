@@ -1,0 +1,99 @@
+name: Bug report
+description: Something in research-scope-mcp is broken or behaves differently than documented.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check [TROUBLESHOOTING.md](https://github.com/AxelVerneBooks/research-scope-mcp/blob/main/TROUBLESHOOTING.md) first: most fetch, data-dir and "never scored" errors are covered there.
+
+        **Security issues:** do not file them here. Follow [SECURITY.md](https://github.com/AxelVerneBooks/research-scope-mcp/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: research-scope-mcp version
+      description: From the `server.start` log line, or `npm ls -g research-scope-mcp`.
+      placeholder: "0.1.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio
+        - Streamable HTTP (--http)
+        - Docker (HTTP)
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: "Claude Code 2.x, Cursor, Cline, custom SDK client..."
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and OS
+      description: Output of `node --version`, plus OS. Mention a proxy, container or sandbox if there is one.
+      placeholder: "v22.12.0, macOS 15, behind corporate proxy"
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool is affected?
+      multiple: true
+      options:
+        - plan_research
+        - fetch_and_score
+        - build_report
+        - check_report
+        - Server startup / transport
+        - Scoring rubric
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The tool call you made (name and arguments) and the full response, including any error text.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence of tool calls that shows the problem. Public URLs only, please.
+      placeholder: |
+        1. fetch_and_score { "source_url": "https://..." }
+        2. build_report { "topic": "...", "sources": ["https://..."] }
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: |
+        stderr JSON lines around the failure, captured with `RESEARCH_SCOPE_LOG_LEVEL=debug`. Remove private URLs and paths before pasting.
+      render: json
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I read TROUBLESHOOTING.md and this is not covered there (or the documented fix did not work).
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

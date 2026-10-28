@@ -4,6 +4,40 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Added
+- Structured JSON-lines logging on stderr (`src/log.ts`), level set by
+  `RESEARCH_SCOPE_LOG_LEVEL`. Logs server start (version, transport, data dir),
+  every tool call's outcome and duration, each fetch, report build/check, and
+  HTTP failures.
+- `TROUBLESHOOTING.md`, covering issues found in a code and test review.
+- GitHub bug-report issue form (`.github/ISSUE_TEMPLATE/bug_report.yml`).
+
+### Changed
+- Tool errors now say what failed and what to do, with a TROUBLESHOOTING.md link:
+  - `fetch_and_score` returns a tool error naming the cause (DNS, connection,
+    TLS, 15s timeout) instead of a bare `fetch failed` protocol error.
+  - `build_report` suggests the scored URL when a source differs only by trailing
+    slash or host case, and says when no sources are scored in this process.
+  - `build_report` reports an unwritable data dir with a `RESEARCH_SCOPE_DATA_DIR` hint.
+  - `check_report` distinguishes an unknown `report_id` from a missing argument,
+    explains relative `report_path` resolution, gives a specific verdict when no
+    claims are found, and adds a `note` when checking by `report_id` (the
+    in-memory shell, not the edited file).
+- HTTP transport: an invalid `--port`/`PORT` exits with an error instead of
+  silently using 3001; `EADDRINUSE`/`EACCES` on listen are logged with a fix;
+  internal errors use JSON-RPC code `-32603` (was `-32700`, parse error).
+- README no longer claims the HTTP transport answers with 401 + `WWW-Authenticate`;
+  it has no auth layer (as SECURITY.md already said).
+- Fetch user-agent reports the real package version.
+
+### Tests
+- New: structured-log format, actionable fetch error, and an offline workflow
+  against a local HTTP fixture (near-miss URL hint, unknown `report_id`,
+  empty-shell verdict, passing edited report).
+- The live-fetch test now fails with the network error instead of a JSON parse error.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed
