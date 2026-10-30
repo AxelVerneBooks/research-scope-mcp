@@ -1,5 +1,6 @@
+#!/usr/bin/env node
 /**
- * research-scope-mcp — MCP server (v0.1.0)
+ * research-scope-mcp — MCP server
  *
  * Research-to-report workflow: plan sources with kill criteria, fetch-and-score
  * them, assemble a citation-registry report shell, then verify every claim has a
@@ -8,8 +9,7 @@
  * Transports:
  *   - stdio (default):  `node dist/index.js`
  *   - Streamable HTTP:  `node dist/index.js --http --port 3001`
- *     Unauthenticated clients get a 401 with WWW-Authenticate pointing at the
- *     discovery document (correct MCP OAuth discovery behavior — never a 403).
+ *     Stateless, no auth layer — keep it on loopback or behind an auth proxy.
  *
  * Tools:
  *   plan_research(scope)            -> source-target plan with kill criteria
