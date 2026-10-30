@@ -4,6 +4,28 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Fixed
+- **`npx -y research-scope-mcp` now runs the server.** `package.json` had no
+  `bin` entry, so the documented one-command launch (and every client config in
+  `clients/`) failed with `npm error could not determine executable to run`, and
+  `npm install -g` installed no command. Added `bin` + a `#!/usr/bin/env node`
+  shebang. **Needs a new npm publish to reach users — 0.1.2 on npm is affected.**
+- README no longer claims the HTTP transport answers unauthenticated requests
+  with 401 + `WWW-Authenticate`; it has no auth layer (requests get 200). The
+  README now says so and points to an auth proxy.
+- `clients/claude-code.json` and `clients/cursor.json` are valid JSON (the `//`
+  comment header made them fail when pasted as-is).
+
+### Added
+- `npm run smoke` (`tools/smoke.mjs`): launches the server with any command
+  (stdio or `--http`) and runs initialize → tools/list → `plan_research`.
+- CI workflow `install-smoke.yml`: on every push/PR, smoke-tests the packed
+  tarball via `npx` and `npm install -g` in a clean directory (Node 20/22, stdio
+  + HTTP), the source build, and the Docker image; weekly, the published npm
+  version too.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed

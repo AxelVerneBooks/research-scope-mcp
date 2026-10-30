@@ -2,6 +2,10 @@
 
 **Turn a scattered source set into a decision-ready, traceable report.**
 
+By [Axel Verne](https://axelverne.com), author of the MCP book series.
+
+[![install smoke](https://github.com/AxelVerneBooks/research-scope-mcp/actions/workflows/install-smoke.yml/badge.svg)](https://github.com/AxelVerneBooks/research-scope-mcp/actions/workflows/install-smoke.yml)
+
 `research-scope-mcp` is an MCP server that runs a research-to-report workflow any
 MCP client can drive end to end:
 
@@ -22,27 +26,57 @@ mechanically enforced, so the report is auditable by a human in 90 seconds.
 
 ## Install
 
-```bash
-npm install -g research-scope-mcp   # once published; local: npm ci && npm run build
-```
-
-Run over stdio (most clients):
+Requires Node.js ≥ 20. No install step is needed — run it straight from npm over
+stdio (what most clients do):
 
 ```bash
-npx research-scope-mcp
+npx -y research-scope-mcp
 ```
 
-Or over Streamable HTTP (remote deployments):
+Or install it globally and run the `research-scope-mcp` command:
 
 ```bash
-npx research-scope-mcp --http --port 3001
-# unauthenticated requests get 401 + WWW-Authenticate discovery, never a bare 403
+npm install -g research-scope-mcp
 ```
+
+Or build from source:
+
+```bash
+git clone https://github.com/AxelVerneBooks/research-scope-mcp
+cd research-scope-mcp
+npm ci && npm run build
+node dist/index.js
+```
+
+Or over Streamable HTTP (remote deployments), served at `http://<host>:3001/mcp`:
+
+```bash
+npx -y research-scope-mcp --http --port 3001
+```
+
+The HTTP listener has no auth layer of its own and binds all interfaces — keep it
+on loopback or behind an authenticating proxy.
+
+Reports and the source registry are written to `./data` in the working directory;
+set `RESEARCH_SCOPE_DATA_DIR` to put them elsewhere.
+
+### Verify the install
+
+```bash
+npm run smoke -- npx -y research-scope-mcp
+```
+
+runs `initialize` → `tools/list` → `plan_research("verify install")` against the
+server exactly as launched and prints `ok - …`
+(`npm run smoke -- --http npx -y research-scope-mcp` checks the HTTP transport). CI runs this against the packed npm tarball, a source
+build, and the Docker image on every push
+([`install-smoke.yml`](.github/workflows/install-smoke.yml)).
 
 ## Client config
 
-Drop-in config snippets for [Claude Code](clients/claude-code.json),
-[Cursor](clients/cursor.json), and a Cline-friendly
+Drop-in config snippets for [Claude Code](clients/claude-code.json) (project
+`.mcp.json`, or `claude mcp add research-scope -- npx -y research-scope-mcp`),
+[Cursor](clients/cursor.json) (`.cursor/mcp.json`), and a Cline-friendly
 [`llms-install.md`](clients/llms-install.md).
 
 ## Docker

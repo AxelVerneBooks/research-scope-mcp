@@ -1,0 +1,98 @@
+# Verifies the install paths documented in README.md / clients/ actually work,
+# from a clean directory with an empty npm cache, then drives the server with
+# tools/smoke.mjs (initialize → tools/list → plan_research). Regressions such as
+# a missing `bin` entry fail here instead of on a user's machine.
+name: install smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1" # weekly: also checks what is live on npm
+
+permissions:
+  contents: read
+
+jobs:
+  npm-tarball:
+    name: npx / npm -g from packed tarball (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Build and pack (exactly what `npm publish` would ship)
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm pack --pack-destination "$RUNNER_TEMP"
+          echo "TARBALL=$(ls "$RUNNER_TEMP"/research-scope-mcp-*.tgz)" >> "$GITHUB_ENV"
+      - name: Client configs are valid JSON
+        run: for f in clients/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" && echo "ok - $f"; done
+      - name: "npx -y research-scope-mcp (stdio), clean dir + empty cache"
+        working-directory: ${{ runner.temp }}
+        env:
+          npm_config_cache: ${{ runner.temp }}/npm-cache-npx
+        run: node "$GITHUB_WORKSPACE/tools/smoke.mjs" -- npx -y --package="$TARBALL" research-scope-mcp
+      - name: "npx -y research-scope-mcp --http --port <n>"
+        working-directory: ${{ runner.temp }}
+        env:
+          npm_config_cache: ${{ runner.temp }}/npm-cache-npx
+        run: node "$GITHUB_WORKSPACE/tools/smoke.mjs" --http -- npx -y --package="$TARBALL" research-scope-mcp
+      - name: "npm install -g research-scope-mcp, then run the command"
+        working-directory: ${{ runner.temp }}
+        env:
+          npm_config_cache: ${{ runner.temp }}/npm-cache-global
+        run: |
+          npm install -g --prefix "$RUNNER_TEMP/global" --no-audit --no-fund "$TARBALL"
+          PATH="$RUNNER_TEMP/global/bin:$PATH" node "$GITHUB_WORKSPACE/tools/smoke.mjs" -- research-scope-mcp
+
+  source:
+    name: build from source + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund && npm run build
+      - name: node dist/index.js (stdio)
+        run: node tools/smoke.mjs -- node dist/index.js
+      - name: node dist/index.js --http
+        run: node tools/smoke.mjs --http -- node dist/index.js
+      - name: npm test (includes one live fetch)
+        run: npm test
+
+  docker:
+    name: Docker image (README docker build/run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: docker build -t research-scope-mcp -f docker/Dockerfile .
+      - name: docker run research-scope-mcp --http --port <n>
+        run: node tools/smoke.mjs --http -- docker run --rm --init --network host research-scope-mcp
+
+  published:
+    name: npx -y research-scope-mcp@latest (live npm)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npx -y research-scope-mcp (from the npm registry)
+        working-directory: ${{ runner.temp }}
+        env:
+          npm_config_cache: ${{ runner.temp }}/npm-cache
+        run: node "$GITHUB_WORKSPACE/tools/smoke.mjs" -- npx -y research-scope-mcp@latest
