@@ -93,6 +93,15 @@ one real fetch; repo `data/` is never touched.
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
 
+## Author
+
+Built by **Axel Verne**, author of the MCP book series — [axelverne.com](https://axelverne.com).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, test requirements, and the PR
+checklist. Every PR must update [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT. See [SECURITY.md](SECURITY.md) for reporting security issues.
