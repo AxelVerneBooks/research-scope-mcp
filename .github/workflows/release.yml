@@ -1,0 +1,82 @@
+# Release: on a version tag push (vX.Y.Z), run the full test suite, build the
+# package, and publish to npm — publish runs ONLY if the test job succeeds.
+#
+# Required repository secret (Settings → Secrets and variables → Actions):
+#   NPM_TOKEN — an npm automation (or granular, publish-scoped) access token for
+#               the account that owns the `research-scope-mcp` package.
+# No credentials live in this file; the token is read from secrets at runtime.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check tag matches every version surface
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          SRV=$(node -p "require('./server.json').version")
+          SRC=$(sed -n 's/.*version = "\(.*\)".*/\1/p' src/version.ts)
+          echo "tag=$TAG package.json=$PKG server.json=$SRV src/version.ts=$SRC"
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$SRV" ] || [ "$TAG" != "$SRC" ]; then
+            echo "::error::Tag v$TAG does not match package.json/server.json/src/version.ts"
+            exit 1
+          fi
+
+      # `npm test` compiles with tsc and runs the full node:test suite,
+      # including the live-network workflow test.
+      - name: Run full test suite
+        run: npm test
+
+  publish:
+    name: Build and publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance attestation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Inspect package contents
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

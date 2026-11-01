@@ -93,6 +93,40 @@ one real fetch; repo `data/` is never touched.
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
 
+## Releasing
+
+Releases are cut by pushing a version tag; GitHub Actions does the rest
+([.github/workflows/release.yml](.github/workflows/release.yml)).
+
+1. **Bump the version** in all three code surfaces — `package.json`,
+   `server.json`, and `src/version.ts` — and add a `CHANGELOG.md` section (full
+   checklist: [docs/publication/release-checklist-version-bump.md](docs/publication/release-checklist-version-bump.md)).
+2. **Verify locally:** `npm test` (builds with `tsc`, then runs the full suite,
+   including one live-network fetch).
+3. **Commit, merge to `main`, then tag and push the tag:**
+
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+4. **The workflow runs two jobs:**
+   - **Test suite:** `npm ci`, checks that the tag matches the version in
+     `package.json`, `server.json` and `src/version.ts`, then runs `npm test`.
+   - **Build and publish:** runs **only if the test job passed**. It runs
+     `npm ci` and `npm run build`, shows the tarball contents with
+     `npm pack --dry-run`, then runs `npm publish --provenance --access public`.
+     If any test fails or the versions don't match, nothing is published.
+5. **After npm is live,** publish the registry entry with `mcp-publisher publish`
+   (see [PUBLISH.md](PUBLISH.md)).
+
+**Required secret:** add a repository secret named **`NPM_TOKEN`** under
+*Settings → Secrets and variables → Actions*. Its value is an npm **automation**
+token, or a granular token with publish rights on `research-scope-mcp`. The
+workflow passes it to npm as `NODE_AUTH_TOKEN`. Never commit a token to the
+repo. npm versions are immutable, so a failed or bad release is fixed by
+releasing the next version, not by re-tagging.
+
 ## License
 
 MIT. See [SECURITY.md](SECURITY.md) for reporting security issues.
@@ -102,3 +136,8 @@ MIT. See [SECURITY.md](SECURITY.md) for reporting security issues.
 This server is the free, tested core of the **Research-to-Report MCP Kit** (field
 guide, worked example packs, setup support). Available at the kit store — link in
 [CHANGELOG.md](CHANGELOG.md) updates.
+
+## About
+
+Built by **Axel Verne**, author of the MCP book series —
+[axelverne.com](https://axelverne.com).
