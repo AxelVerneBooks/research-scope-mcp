@@ -4,6 +4,10 @@
   "description": "MCP server for research-to-report workflows: plan sources, fetch-and-score them, and build/verify citation-registry reports.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AxelVerneBooks/research-scope-mcp.git"
+  },
   "files": [
     "dist",
     "README.md",
