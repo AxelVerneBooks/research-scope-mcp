@@ -2,6 +2,8 @@
 
 **Turn a scattered source set into a decision-ready, traceable report.**
 
+By [Axel Verne](https://axelverne.com), author of the MCP book series.
+
 `research-scope-mcp` is an MCP server that runs a research-to-report workflow any
 MCP client can drive end to end:
 
@@ -92,6 +94,21 @@ one real fetch; repo `data/` is never touched.
 `score ≥ 80` → A, `≥ 65` → B, `≥ 45` → C, else D. The rubric is inside
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
+
+## Security
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs
+`npm audit --audit-level=high` on every push to `main` and every pull request.
+The build fails if any dependency (production or dev) has a known **high** or
+**critical** advisory; moderate/low findings are reported in the log but don't
+block. Run the same check locally with:
+
+```bash
+npm audit --audit-level=high
+```
+
+Fixes are dependency bumps. To report a vulnerability in this server itself, see
+[SECURITY.md](SECURITY.md).
 
 ## License
 
