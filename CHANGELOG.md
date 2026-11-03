@@ -4,6 +4,19 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Security
+- Bumped `zod` `^3.24.0` → `^4.6.7` (GHSA-mrhx-c7xc-m3w5, high: memory exhaustion
+  validating oversized constrained collections). `@modelcontextprotocol/sdk`
+  supports `zod ^3.25 || ^4.0`; tool schemas and validation are unchanged.
+- Lockfile refresh: `body-parser` 2.4.0 (GHSA-27r3-jxmh-p828, high) and
+  `fast-uri` 3.1.9 (four moderate advisories), both transitive via the MCP SDK.
+
+### Added
+- GitHub Actions CI (`.github/workflows/ci.yml`): `npm ci`, `npm audit
+  --audit-level=high`, `npm test` on Node 20 and 22.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed
