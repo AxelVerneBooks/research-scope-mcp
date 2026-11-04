@@ -61,6 +61,43 @@ docker run --rm -i -p 3001:3001 research-scope-mcp --http --port 3001
 | `build_report` | `topic`, `sources[]` (must already be scored) | report shell saved under `data/reports/`, `[Sn]` citation numbering |
 | `check_report` | `report_id` or `report_path` | pass/fail + orphan-claim error list |
 
+## Input Validation
+
+Every tool's parameters are validated with [Zod](https://zod.dev) before the tool
+runs. The schemas live in [src/validation.ts](src/validation.ts) and are the same
+ones advertised to clients as JSON Schema in `tools/list`, so what a client sees is
+what the server enforces.
+
+A rejected call never reaches the handler and never throws a protocol error: it
+comes back as a normal tool result with `isError: true` and text like
+
+```text
+Input validation error: Invalid arguments for tool build_report: each sources entry "www.nhtsa.gov" is not a valid absolute URL — include the scheme and host, e.g. "https://www.nhtsa.gov/" at sources.0
+```
+
+Each message names the field (with its array index, e.g. `sources.1`), says what
+was wrong, and says what to send instead. All problems in a call are reported
+together, one per line. String inputs are trimmed before checks.
+
+| Tool | Parameter | Rule |
+|---|---|---|
+| `plan_research` | `scope` | required string, 3–500 chars |
+| | `domain_hints` | optional array of ≤20 non-empty strings, each ≤100 chars |
+| `fetch_and_score` | `source_url` | required absolute `http`/`https` URL, ≤2048 chars (`file:`, `javascript:`, relative URLs refused) |
+| `build_report` | `topic` | required string, 3–200 chars |
+| | `sources` | required array of 1–50 unique `http`/`https` URLs (each must also have been scored, checked at run time) |
+| `check_report` | `report_id` | optional, the 8-char lowercase hex id printed by `build_report` |
+| | `report_path` | optional path ending in `.md` / `.markdown` |
+| | *(either)* | at least one of `report_id` / `report_path` is required |
+
+Unknown extra properties are ignored rather than rejected, for compatibility with
+clients that add metadata. The same checks are available outside the server via
+`validateToolInput(toolName, args)`, which returns `{ ok: true, data }` or
+`{ ok: false, message }` with identical message text. Unit tests covering valid and
+invalid inputs for every tool are in
+[test/validation.test.mjs](test/validation.test.mjs) (`npm run test:unit`, no
+network needed).
+
 ## Example walkthrough
 
 See [docs/runs/](docs/runs/) for two worked runs with inputs and outputs, and
@@ -92,6 +129,10 @@ one real fetch; repo `data/` is never touched.
 `score ≥ 80` → A, `≥ 65` → B, `≥ 45` → C, else D. The rubric is inside
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
+
+## Author
+
+Built by Axel Verne, author of the MCP book series — [axelverne.com](https://axelverne.com).
 
 ## License
 

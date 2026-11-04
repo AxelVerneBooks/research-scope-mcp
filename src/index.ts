@@ -26,10 +26,16 @@ import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
 
 import { scoreSource, type SourceScore } from "./scoring/score.js";
 import { version } from "./version.js";
+import {
+  planResearchInput,
+  fetchAndScoreInput,
+  buildReportInput,
+  checkReportInput,
+  checkReportTargetError,
+} from "./validation.js";
 
 const DATA_DIR = pathResolve(process.env.RESEARCH_SCOPE_DATA_DIR ?? pathResolve(process.cwd(), "data"));
 
@@ -196,10 +202,7 @@ server.registerTool(
     title: "Plan research scope",
     description:
       "Turn a research scope into a source-target plan with kill criteria: primary-source targets, corroborating targets, and when to abandon the topic for lack of sources.",
-    inputSchema: {
-      scope: z.string().min(3).describe("What is being researched, e.g. 'verify vendor claim about NREMT 2025 exam change'"),
-      domain_hints: z.array(z.string()).optional().describe("Suggested source domains, e.g. ['.gov', 'arxiv.org']"),
-    },
+    inputSchema: planResearchInput,
   },
   async ({ scope, domain_hints }) => {
     const hints = domain_hints?.length ? domain_hints : [".gov", ".edu", "arxiv.org", "press"];
@@ -238,9 +241,7 @@ server.registerTool(
     title: "Fetch and score a source",
     description:
       "Crawl one source URL and return an explainable 0-100 quality score: primary-source detection, publication freshness, paywall and conflict-of-interest flags. Scores are registered for use in build_report/check_report.",
-    inputSchema: {
-      source_url: z.string().url().describe("The source URL to fetch and score"),
-    },
+    inputSchema: fetchAndScoreInput,
   },
   async ({ source_url }) => {
     const fetched = await fetchSource(source_url);
@@ -267,10 +268,7 @@ server.registerTool(
     title: "Build citation-registry report shell",
     description:
       "Assemble a report shell from already-scored sources: claims section stubs, numbered citation registry, scoring appendix. Returns the markdown and saves it under data/reports/.",
-    inputSchema: {
-      topic: z.string().min(3).describe("Report topic / title"),
-      sources: z.array(z.string().url()).min(1).describe("Source URLs previously scored with fetch_and_score"),
-    },
+    inputSchema: buildReportInput,
   },
   async ({ topic, sources }) => {
     const entries: PaperTrailEntry[] = [];
@@ -329,12 +327,13 @@ server.registerTool(
     title: "Check report citation coverage",
     description:
       "Verify every substantive claim in a report cites at least one scored source. Orphan claims are returned as an error list — never a pass. Accepts a report id (as built) or a markdown file path.",
-    inputSchema: {
-      report_id: z.string().optional().describe("Report id returned by build_report"),
-      report_path: z.string().optional().describe("Path to a report markdown file (overrides report_id)"),
-    },
+    inputSchema: checkReportInput,
   },
   async ({ report_id, report_path }) => {
+    const targetError = checkReportTargetError({ report_id, report_path });
+    if (targetError) {
+      return { isError: true, content: [{ type: "text" as const, text: targetError }] };
+    }
     let markdown: string | null = null;
     let label = report_id ?? report_path ?? "";
     if (report_path) {
@@ -350,7 +349,12 @@ server.registerTool(
     } else {
       return {
         isError: true,
-        content: [{ type: "text" as const, text: "Provide either report_id (from build_report) or report_path." }],
+        content: [
+          {
+            type: "text" as const,
+            text: `No report with id "${report_id}" in this server session — ids live in memory only, so after a restart pass report_path (the .md file printed by build_report) instead.`,
+          },
+        ],
       };
     }
 
