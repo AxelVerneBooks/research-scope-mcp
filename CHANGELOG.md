@@ -4,6 +4,20 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Added
+- **Zod input validation with actionable errors for every tool** (`src/validation.ts`).
+  Each message names the field (and array index), what was wrong, and what to send
+  instead; rejected calls return `isError: true` tool results. New rules: http/https
+  only for URLs, length caps, unique `build_report` sources, `report_id` format,
+  `.md`/`.markdown` `report_path`. Unit tests in `test/validation.test.mjs`
+  (`npm run test:unit`); README gains an *Input Validation* section.
+
+### Changed
+- `check_report` with an unknown `report_id` now says ids are in-memory only and
+  suggests `report_path`, instead of the generic "provide either…" message.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed
