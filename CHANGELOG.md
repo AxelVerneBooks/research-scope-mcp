@@ -4,6 +4,19 @@ All notable changes to `research-scope-mcp`. Each version bump is one immutable
 registry publish version (official MCP registry rule: versions are unique per publish;
 metadata is immutable, so fix errors by publishing a *new* version).
 
+## [Unreleased]
+
+### Added
+- **Configurable outbound timeouts and rate-limit handling** for `fetch_and_score`
+  (`src/http/fetchPolicy.ts`). The timeout now also covers reading the body. 429/503
+  responses honour `Retry-After` (seconds or HTTP-date), or fall back to
+  exponential backoff with jitter. Retries and waits are bounded. Timeouts and
+  exhausted rate limits come back as tool errors and the source is left unscored.
+  New env vars: `RESEARCH_SCOPE_FETCH_TIMEOUT_MS`, `RESEARCH_SCOPE_FETCH_MAX_RETRIES`,
+  `RESEARCH_SCOPE_FETCH_RETRY_BASE_MS`, `RESEARCH_SCOPE_FETCH_RETRY_MAX_DELAY_MS`
+  (see README “Configuration”).
+- `npm run test:unit`: mock-only unit tests for the timeout and rate-limit paths.
+
 ## [0.1.2] — 2026-10-17
 
 ### Fixed
