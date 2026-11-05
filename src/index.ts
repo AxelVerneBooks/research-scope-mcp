@@ -30,8 +30,10 @@ import { z } from "zod";
 
 import { scoreSource, type SourceScore } from "./scoring/score.js";
 import { version } from "./version.js";
+import { fetchText, loadFetchPolicy, FetchTimeoutError, RateLimitedError } from "./http/fetchPolicy.js";
 
 const DATA_DIR = pathResolve(process.env.RESEARCH_SCOPE_DATA_DIR ?? pathResolve(process.cwd(), "data"));
+const FETCH_POLICY = loadFetchPolicy();
 
 /* ------------------------------------------------------------------ */
 /* report model                                                        */
@@ -79,36 +81,33 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-async function fetchSource(url: string, timeoutMs = 15000): Promise<{ status: number; title: string; text: string; headers: Record<string, string>; finalUrl: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
+async function fetchSource(url: string): Promise<{ status: number; title: string; text: string; headers: Record<string, string>; finalUrl: string }> {
+  const res = await fetchText(
+    url,
+    {
       redirect: "follow",
       headers: {
         "user-agent": "research-scope-mcp/0.1 (+research-scoring)",
         accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
       },
-    });
-    const contentType = res.headers.get("content-type") ?? "";
-    const raw = await res.text();
-    const isHtml = contentType.includes("html");
-    const titleMatch = isHtml ? raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i) : null;
-    return {
-      status: res.status,
-      title: titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "",
-      text: isHtml ? htmlToText(raw) : raw.slice(0, 200_000),
-      headers: {
-        "content-type": contentType,
-        "last-modified": res.headers.get("last-modified") ?? "",
-        date: res.headers.get("date") ?? "",
-      },
-      finalUrl: res.url || url,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
+    },
+    FETCH_POLICY
+  );
+  const contentType = res.headers.get("content-type") ?? "";
+  const raw = res.text;
+  const isHtml = contentType.includes("html");
+  const titleMatch = isHtml ? raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i) : null;
+  return {
+    status: res.status,
+    title: titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "",
+    text: isHtml ? htmlToText(raw) : raw.slice(0, 200_000),
+    headers: {
+      "content-type": contentType,
+      "last-modified": res.headers.get("last-modified") ?? "",
+      date: res.headers.get("date") ?? "",
+    },
+    finalUrl: res.url,
+  };
 }
 
 /** Extract claim-looking sentences from markdown ("claims" = assertion-bearing lines). */
@@ -243,7 +242,16 @@ server.registerTool(
     },
   },
   async ({ source_url }) => {
-    const fetched = await fetchSource(source_url);
+    let fetched: Awaited<ReturnType<typeof fetchSource>>;
+    try {
+      fetched = await fetchSource(source_url);
+    } catch (err) {
+      if (err instanceof FetchTimeoutError || err instanceof RateLimitedError) {
+        // Not scored, not registered: a timeout or rate-limit page is not evidence.
+        return { isError: true, content: [{ type: "text" as const, text: `${err.message}. Source was not scored.` }] };
+      }
+      throw err;
+    }
     const score = scoreSource({
       url: fetched.finalUrl,
       title: fetched.title,

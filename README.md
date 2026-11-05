@@ -2,6 +2,8 @@
 
 **Turn a scattered source set into a decision-ready, traceable report.**
 
+By [Axel Verne](https://axelverne.com), author of the MCP book series.
+
 `research-scope-mcp` is an MCP server that runs a research-to-report workflow any
 MCP client can drive end to end:
 
@@ -44,6 +46,52 @@ npx research-scope-mcp --http --port 3001
 Drop-in config snippets for [Claude Code](clients/claude-code.json),
 [Cursor](clients/cursor.json), and a Cline-friendly
 [`llms-install.md`](clients/llms-install.md).
+
+## Configuration
+
+All settings are environment variables; set them in your client's `env` block
+(see [Client config](#client-config)) or the shell that launches the server.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `RESEARCH_SCOPE_DATA_DIR` | `./data` | Where report shells are written. |
+| `PORT` | `3001` | HTTP port when run with `--http` and no `--port`. |
+| `RESEARCH_SCOPE_FETCH_TIMEOUT_MS` | `15000` | Per-attempt timeout for outbound fetches (`fetch_and_score`). Covers connecting, headers **and** reading the body. Must be > 0. |
+| `RESEARCH_SCOPE_FETCH_MAX_RETRIES` | `2` | How many times to retry a rate-limited response (HTTP 429 or 503) after the first attempt. `0` disables retries. |
+| `RESEARCH_SCOPE_FETCH_RETRY_BASE_MS` | `500` | Base delay for exponential backoff (with jitter) when the server sends no `Retry-After`. Attempt *n* waits between ½ and 1× `base × 2ⁿ`. |
+| `RESEARCH_SCOPE_FETCH_RETRY_MAX_DELAY_MS` | `30000` | Cap on any single wait. If a server's `Retry-After` asks for longer than this, the server stops retrying right away instead of stalling the tool call. |
+
+Invalid values (non-numeric, negative, or a zero timeout) fall back to the default.
+
+How outbound fetches behave:
+
+- **Timeouts** are not retried. `fetch_and_score` returns a tool error
+  (`isError: true`, `Request to … timed out after N ms. Source was not scored.`)
+  and the URL is **not** registered, so it can't be cited in a report by accident.
+- **Rate limits** (429 / 503): a `Retry-After` header, as delta-seconds or an
+  HTTP-date, is honoured exactly. Without one, the server falls back to
+  exponential backoff. Once retries run out, or the requested wait is over the
+  cap, the tool returns a `Rate limited by …` error that includes the
+  server's `Retry-After` when there was one. No score is recorded.
+- Other HTTP statuses (404, 500, …) are not retried. They are scored as usual,
+  and availability is marked down accordingly.
+
+Example (Claude Code / Cursor client config):
+
+```json
+{
+  "mcpServers": {
+    "research-scope": {
+      "command": "npx",
+      "args": ["-y", "research-scope-mcp"],
+      "env": {
+        "RESEARCH_SCOPE_FETCH_TIMEOUT_MS": "8000",
+        "RESEARCH_SCOPE_FETCH_MAX_RETRIES": "3"
+      }
+    }
+  }
+}
+```
 
 ## Docker
 
@@ -92,6 +140,13 @@ one real fetch; repo `data/` is never touched.
 `score ≥ 80` → A, `≥ 65` → B, `≥ 45` → C, else D. The rubric is inside
 [src/scoring/score.ts](src/scoring/score.ts) and returns its evidence, so a score is
 auditable, not a vibe.
+
+## Tests
+
+```bash
+npm run test:unit   # timeout + rate-limit policy, fully mocked (no network)
+npm test            # unit tests + stdio/HTTP integration tests (one live fetch)
+```
 
 ## License
 
